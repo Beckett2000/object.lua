@@ -1,25 +1,25 @@
 -- object.lua - 3.0 - (Beckett Dunning 2014 - 2025) - Object oriented lua programming 
 ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 local Lib_Version = 3.0 -- object unified environment (dev build) - WIP (3-10-25)
-  
+
 -- This script adds an Object Oriented aproach to Lua Programming Calls. Traditionally in lua, there is little notion of inheritance or classes. This script allows for Javascript like progamming calls in chained sequence as opposed to the traditional structure of raw Lua
 
 object,libs = {},{} local _object,object = object,{} -- aliases object class / stores libraries
 local meta = {__index = self,__type = "object class", __version = Lib_Version,
     __tostring = function(self) -- gives objects a tostring native behavior
-        local vals = {} for k,_ in pairs(self) do table.insert(vals,tostring(k)) end
+    local vals = {} for k,_ in pairs(self) do table.insert(vals,tostring(k)) end
     table.sort(vals) return "(object baseClass):["..table.concat(vals,", ").."]" end,
     __call = function(self,...) -- creates object class from initializer
     return -- self.init and self:init(...) or 
-        self:new(...) end } 
-setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
-
+    self:new(...) end } 
+    setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
+    
 -- Local variable declaration for speed improvement
 local type,pairs,table,unpack,setmetatable,getmetatable,getfenv,setfenv,object = 
 type,pairs,table,table.unpack,setmetatable,getmetatable,getfenv,setfenv,object
 local abs,pi,cos,min,max,pow,acos,floor,sqrt = math.abs,math.pi,math.cos,
 math.min,math.max, math.pow,math.acos,math.floor,math.sqrt
-
+    
 -- accepted metatable keys to be parsed from object
 local meta_tables,meta_ext = { __index = true, __tostring = true,  __newindex = true, __call = true, __add = true, __sub = true, __mul = true, __div = true, __unm = true, __concat = true, __len = true, __eq = true, __lt = true, __le = true}, { __type = true, __version = true, __namespace = true}
 
@@ -719,6 +719,57 @@ end
 
 -------------------------------------------
 
+------ ------ ------ ------
+-- Object Scope - API Notes
+------ ------ ------ ------
+
+-- Object Methods - Stack Calls
+
+-- object:inScopeOf() -- Iterator overload - Iterate once and set scope to object implicitly -> local scope becomes object 
+
+-- for scope in object:inScopeOf do
+-- end
+
+-- setScope(scope,bind/reset) - Update Dynamic Pointer
+-- pushScope() -- Add to array and set dynamic pointer
+-- popScope() -- Remove from array and set dynamic pointer
+
+-- (for all) -> returns: scope
+
+------ ------ 
+
+-- TODO - Later - Think of this like an object, splice, slice, pop(index), etc. to change scope position (obfus idea from note 3-10-25 - 02:00)
+
+------ ------ ------ ------
+
+-- Scope Object Methods
+
+-- scope:next() / scope:previous() - scope stack movement
+
+-- scope:release() - clear stack / return to main scope
+-- scope:bind(scope) - (alias) - clear scope stack and set to new scope - scope:bind(nil) - same as scope:release()
+
+---- ----
+
+-- TODO - Scope Traceback (Stack)
+
+-- Improvement Idea: 1) Try to look at _G first - Is it the scope pointer?
+-- 2) If you call debug to iterate up, store it in an array so you can look back without calling debug.getupvalue each time
+-- 3) If 1 and 2 fail, use debug.getupvalue to iterate back and populate the array (2) to be used as an alternate for step 2
+-- (Dynamic Pointer) Store a pointer to be used in 1 as the last if the last is not _G - See step 1
+
+------ ------ ------ ------
+local _getGlobalScope = function()
+    
+    if _VERSION ~= "Lua 5.1" then
+      local scope = _ENV or _G
+      return scope
+    else return _G end
+    
+end
+
+------ ------ ------ ------
+
 if _VERSION == "Lua 5.1" then -- manipulates scope in versions prior to lua 5.2
 
   -- (private) Helper Functions ---------- ---------- ---------- ----------
@@ -775,7 +826,7 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
    -- Iterators (for (values) in (iterator) do) ---------- -------- 
     
    object.inScopeOf = function(self)
-    local env,step = _ENV or _G, 0
+    local env,step = _getGlobalScope(), 0
     local scopeWrapper;
         
     scopeWrapper = function() 
@@ -815,10 +866,13 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
 
     return scopeWrapper end
     
-   -- Scope Stack Manipulation Methods ---------- ---------- ---------- ---------- 
+   -- Scope Stack Manipulation Methods ---------- ---------- ----------  
     
+   --- object.getScope: function
    object.getScope = function(self) -- Gets object's global scope   
-    local currentScope = _ENV or _G if not self then return currentScope end 
+    local currentScope = _getGlobalScope()
+    if not self then 
+        return currentScope end 
     local scope,meta = {self = self},{__type = "scope", __prev = currentScope,
             
     __index = function(val,key) -- Indexes in environment point to object
@@ -838,18 +892,38 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
     local meta = getmetatable(_ENV) if meta then getmetatable(scope).__prev = _ENV end   
         
      _ENV = scope return end
-
-   object.pushScope = function(self) -- Pushes a copy of the current scope onto the stack
-    if object.type(_ENV) == "scope" then local scope = _ENV:copy() 
-     getmetatable(scope).__prev = _ENV -- Sets previous meta index to current environment
-    _ENV = scope return end end -- Sets caller environment to scope copy
-
-   object.popScope = function(self) -- Removes current scope from top of stack
-    local meta = getmetatable(_ENV) if meta and meta.__prev then _ENV = meta.__prev return 
+    
+   --- object.pushScope: function
+   -- Pushes a pointer to the current scope onto the stack - TBD: Do you ever want a copy -> env:copy()
+    
+   object.pushScope = function(self) 
+        
+    local env,scope = _getGlobalScope()
+    local scope = object.type(env) == "scope" and env == self and env 
+    scope = scope and scope or (env ~= self and object.type(self) == "scope") and self or self:getScope()
+        
+     if not scope and type(self) == "table" then scope = object(self):getScope()
+     end
+    
+     if scope then
+      getmetatable(scope).__prev = env   
+     end
+        
+     _ENV = scope 
+        
+    return scope end
+    
+   --- object.popScope: function
+   -- Removes last scope from scope stack
+    
+   object.popScope = function(self) 
+         
+    local scope = _getGlobalScope()     
+    local meta = getmetatable(scope) if meta and meta.__prev then _ENV = meta.__prev return 
     else return error("No object is currently in scope.") end end    
     
-   object.env = function() return _ENV end
-
+   -- object.env = function() return _ENV end -- TODO - add this back with better pointer - getter?
+    
 end
 
 ----- ----------- ----------- -----------
@@ -904,257 +978,3 @@ end
 -- return object
 
 ----- ----------- ----------- ----------- ----------- ----------- -----------
-
-
-
-
--------------------------------------------
-
---[[ -- Testing --------------
-
---object.ext(object.insert):dict() object.ext(object.insert):dict().Last = function(self,value,...) 
-
-object.ext(object.insert):dict().Test = function(self,value,...) -- adds values to end of table
-    print(self," test 1 2 3")
-end
-
-object.insert.Test.one = function(self) print("self one ",self) end
-
----------- ---------- ---------- ]]
-
-object.test = function(self)
-    return self
-end
-
-object.insert.test = function(self)
-    return self
-end
-
--------------------------------------------
-
--- Test the object scope me
-
-testObject = function() 
-    
-    print(_VERSION)
-    
-    --[==[
-    
-    --[[
-    print(test)
-    test:insertFirst("z"):insertLast("a")
-    print(test)
-    test.insert:First("letter")
-    print(test)
-    ]]
-    
-    ------ ------ ------ ------
-    
-    test:insertFirst("alpha")
-    test.insert:First("beta")
-    
-    ------ ------ ------ ------
-    print("AB - This is the new object:",test)
-    ------ ------ ------ ------
-    ]==]
-      
-    
-    --[[
-    
-    local fruits = object{"apple"}
-    local vegs = object{"carrot"}
-    
-    print("The plants:",fruits,vegs)
-    
-    fruits.insert.first("orange")
-    object.insert.first(fruits,"grape")
-    
-    print("The new plants:",fruits,vegs)
-    
-    --]]
-
-    --[[
-    
-    local plant = fruits.insert
-    object.insertFirst(fruits,vegs,"orange")
-    ]]
-    
-    --plant:first(vegs,"orange")
-    
-    --print("The new plants:",fruits,vegs)
-    
-    
-    local plant = object{"seed"}
-    object.unshift(plant,"flower")
-    print("The plant:",plant)
-    
-    local bar = object{apple="red","a","b","c"}
-    bar = bar{"a","b","c"}
-    
-    --[[
-    plant:pushScope()
-    
-    print("This is the plant:",self)
-    
-    popScope()
-    ]]
-
-    for scope in plant:inScopeOf() do
-        
-        print("in the scope loop")
-        print("Initial Value:",self)
-        print(self == nil)
-    
-        -- push("light","sky")
-        
-        local plant = object{"flower"}
-        
-        self:focus()
-        
-        push("light"):push("sky"):pop()
-        blur()
-        push(self,"light"):push("sky"):pop()
-        
-        push(plant,"stem")
-        
-        print("New Value:",self)
-        print("Plant:",plant)
-        
-        -- self:focus() / self:blur()
-        
-        --[[ ,
-        self.insert.first("light")
-        insert.first("dew")
-        insert.last("rain")
-        
-        --object.insert.atIndex(self,3,"grape","car","foo")
-        insert.atIndex(3,"grape","car","foo")
-        
-        print("New Value:",self,
-        self:firstIndexOf("car")
-        ]]
-        
-        print("New Value:",self)
-        
-        -- self:proto()
-        -- )
-        
-        --[[
-        print("Object Test:", 
-         insert.test() == insertTest(),
-        in(self))
-        ]]
-        
-        ----------- -----------
-        -- unshift(self,"apple")
-        -- self:unshift("apple-a")
-        -- unshift(self,"apple-b")
-        ----------- -----------
-        
-        --[[
-        local b = push("apple","tree") -- implicit self
-        
-        print("This is b:",b)
-        
-        ----------- -----------
-        
-        -- :push("leaves")
-        print("New Value:",self)
-        ]]
-        
-        -- local test unshift("foo","bar")
-      --  print("Test:", unshift("a","b"))
-        
-        --[[
-        local test = unshift("foo"):push("bar")
-        
-        print("Test:",test)
-        ]]
-        
-        --[[
-        local test = object()
-        test:unshift("foo"):push("bar")
-        print("Test:",test)
-        ]]
-        
-        
-        --[==[
-        -- print("Type:",type(insertFirst))
-        -- insertFirst("orange")
-        
-        -- print(first(self))
-        --print(first())
-        
-        unshift("foo")
-        
-        local b = test()
-        local c = test()
-        
-        insert.first("tree")
-        ]]
-        
-        -- self:unshift("orange")
-
-        --[==[
-        
-        self:insertFirst("leaves")
-        self.insert.First("branches")
-        self.insert.first("twigs")
-        
-        print("Tree:",self)
-        
-        insert.first("fruit")
-        insert:first("fruits")
-        
-        ------------- ------------- 
-        
-        self:unshift("orange")
-        unshift("berries")
-        
-        print("New Tree:",self,apple)
-
-        --[====[
-           
-        --[[                 
-        local inserter = self.insert
-        print("This is the inserter:", self.insert)
-        ]]
-               
-        --[[           
-        print("keys")  
-        for k,v in pairs(inserter) do
-         print("Key:",key,"Value:",value)                       
-        end
-        ]]               
-                            
-        print("This is insert first:")
-        ]==]
-        
-        -- insert.first("test")
-        
-        --insert(1,"wind")
-        --insertFirst("foo")
-        
-        -- print(self == nil)
-        
-        --]====]
-        
-    end
-    
-    ------------- ------------- 
-    
-    --[[
-    local rock = object()
-    local a = rock:test()
-    local b = rock:test()
-    ]]
-    
-    print("Selfness 2", a == rock)
-    
-    ------------- ------------- 
-        
-end
-
--------------------------------------------
-
-
