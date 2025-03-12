@@ -32,12 +32,12 @@ i.e. local value = object() / object.new()
 
 Usage example:
 
-`
+```lua
 local tree = object{leaves = "green")
 tree:insertFirst("branches") -> tree{"branches",leaves = "green"}
 tree.insert.first("bark") -> -> tree{"bark","branches",leaves = "green"}
 tree.insert:Last("dew") -> -> tree{"bark","branches",leaves = "green","dew"}
-`
+```lua
 
 ------ ------ ------ ------
 
@@ -121,6 +121,8 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 
 -- object:scope example
 
+```lua
+
     local plant = object{"seed"}
     object.unshift(plant,"flower")
     print("The plant:",plant)
@@ -149,6 +151,8 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
     popScope()
     
     print("Selfness:",self)
+
+```
 
 ------ ------ ------ ------
 
