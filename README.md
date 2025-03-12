@@ -9,8 +9,6 @@ Object Oriented Lua Programming
 Constructor: object() / object.new()
 ```
 
------- ------ ------ ------
-
 ```lua
 local value = object() / object.new()
 print("Hello object!")
