@@ -18,7 +18,8 @@ print("Hello object!")
 
 ------ ------ ------ ------
 
--- (_.insert, _.remove) - Prefix Block Extensions
+-- Insert / Remove (_.insert, _.remove)
+  Custom Object Syntax - (prefix)
 
 -- These prefix extensions search for the insert or remove prefix when referenced to create custom method call blocks. Using the declaration syntax, subclasses can append custom local methods to these extensions. The usage structure is below:
 -- Declaration: object.|insert/remove|Extension IE: object.insertValue
