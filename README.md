@@ -47,8 +47,9 @@ Note: In the case of object.insert, the key of insert (on the object) is a custo
 
 ---------------
 
--- Add data to object
+(_.insert) overload - Add data to object
 
+```
 object.insert.first / object.unshift
 object.insert.last / object.push
 object.insert.atIndex
@@ -56,11 +57,13 @@ object.insert.firstIndexiesFromTable
 object.insert.lastIndexiesFromTable
 object.insert.atIndexIndexiesFromTable
 object.insert.keysFromTable
+```
 
 ------ ------
 
--- Remove data from object
+(_.remove) overload - Remove data from object
 
+```
 object.remove.index
 object.remove.indexies
 object.remove.first / object.shift
@@ -74,9 +77,13 @@ object.remove.indexiesOf
 object.remove.range
 object.remove.entry
 object.remove.entries
+```
 
 ------ ------
 
+Utility Functions / Methods
+
+```
 object.countElements
 object.contains
 object.indexiesOf
@@ -96,17 +103,22 @@ object.isTypeOf
 object.meta
 object.super
 object.copy
+```
 
 ------ ------ ------ ------
 
 -- Chaining - Calls which return an object can be chained
 
+```lua
 local colors = object()
 colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
+```
 
 ------ ------ ------ ------
 
 -- Object Methods - Scope Stack
+
+```
 
 -- object:inScopeOf() -- Iterator overload - Iterate once and set scope to object implicitly -> local scope becomes object 
 
@@ -119,9 +131,11 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 
 -- (for all) -> returns: scope
 
+```
+
 ------ ------ ------ ------
 
--- object:scope example
+Usage Example - object:scope example
 
 ```lua
 
@@ -158,7 +172,7 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 
 ------ ------ ------ ------
 
--- Scope Object Methods
+Scope Object Methods
 
 ```
   scope:next() / scope:previous() - scope stack movement
