@@ -9,8 +9,16 @@ Object Oriented Lua Programming
 API Methods
 ------------
 
+```
 Constructor: object() / object.new()
-i.e. local value = object() / object.new()
+```
+
+------ ------ ------ ------
+
+```lua
+local value = object() / object.new()
+print("Hello object!")
+```
 
 ------ ------ ------ ------
 
@@ -166,7 +174,7 @@ Usage Example - object:scope example
     print("The bush (out of scope)",self)
     popScope()
     
-    print("Selfness:",self)
+    print("Self - (should be nil) :)",self)
 
 ```
 
