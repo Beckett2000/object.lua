@@ -20,6 +20,7 @@ i.e. local value = object() / object.new()
 -- Declaration: object.|insert/remove|Extension IE: object.insertValue
 -- Calling Syntax Examples: 
 
+```
   object:insertValue() 
 
   object.insert:value() / object.insert:Value()
@@ -27,6 +28,7 @@ i.e. local value = object() / object.new()
 
   object:insert():Value() / object:insert():value()
   object:insert().Value() / object:insert().value()
+```
 
 ------ ------ ------ ------
 
@@ -35,8 +37,8 @@ Usage example:
 ```lua
 local tree = object{leaves = "green")
 tree:insertFirst("branches") -> tree{"branches",leaves = "green"}
-tree.insert.first("bark") -> -> tree{"bark","branches",leaves = "green"}
-tree.insert:Last("dew") -> -> tree{"bark","branches",leaves = "green","dew"}
+tree.insert.first("bark") -> tree{"bark","branches",leaves = "green"}
+tree.insert:Last("dew") -> tree{"bark","branches",leaves = "green","dew"}
 ```
 
 ------ ------ ------ ------
@@ -158,9 +160,11 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 
 -- Scope Object Methods
 
--- scope:next() / scope:previous() - scope stack movement
+```
+  scope:next() / scope:previous() - scope stack movement
 
--- scope:release() - clear stack / return to main scope
--- scope:bind(scope) - (alias) - clear scope stack and set to new scope - scope:bind(nil) - same as scope:release()
+  scope:release() - clear stack / return to main scope
+  scope:bind(scope) - (alias) - clear scope stack and set to new scope - scope:bind(nil) - same as scope:release()
+```
 
 ------ ------ ------ ------
