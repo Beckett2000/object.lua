@@ -139,7 +139,7 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 
 ------ ------ ------ ------
 
-Usage Example - object:scope example
+Usage Example - scope object
 
 ```lua
 
