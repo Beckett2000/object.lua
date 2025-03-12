@@ -129,9 +129,9 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 -- for scope in object:inScopeOf do
 -- end
 
--- setScope(scope,bind/reset) - Update Dynamic Pointer
 -- pushScope() -- Add to array and set dynamic pointer
 -- popScope() -- Remove from array and set dynamic pointer
+-- (WIP) setScope(scope,bind/reset) - Update Dynamic Pointer
 
 -- (for all) -> returns: scope
 
