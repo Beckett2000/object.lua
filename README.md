@@ -176,7 +176,7 @@ Usage Example - object:scope example
 
 ------ ------ ------ ------
 
-Scope Object Methods
+Scope Object Methods - WIP
 
 ```
   scope:next() / scope:previous() - scope stack movement
