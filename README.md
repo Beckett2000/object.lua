@@ -148,8 +148,8 @@ Usage Example - object:scope example
     print("The plant:",plant)
 
     for scope in plant:inScopeOf() do
-     plant:pop("water")
-     pop("nutrients")
+     plant:push("water")
+     push("nutrients")
      print("The plant:",self) --> plant{"seed","water","nutrients"}
     end
 
