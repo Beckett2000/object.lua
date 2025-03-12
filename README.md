@@ -5,10 +5,6 @@ object.lua
 Object Oriented Lua Programming
 ------ ------ ------ ------
 
-------------
-API Methods
-------------
-
 ```
 Constructor: object() / object.new()
 ```
@@ -55,7 +51,7 @@ Note: In the case of object.insert, the key of insert (on the object) is a custo
 
 ---------------
 
-(_.insert) overload - Add data to object
+Insertions - (_.insert) custom object - Add data to object
 
 ```
 object.insert.first / object.unshift
@@ -69,7 +65,7 @@ object.insert.keysFromTable
 
 ------ ------
 
-(_.remove) overload - Remove data from object
+Removals (_.remove) custom object - Remove data from object
 
 ```
 object.remove.index
