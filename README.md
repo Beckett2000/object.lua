@@ -146,7 +146,13 @@ Usage Example - object:scope example
     local plant = object{"seed"}
     object.unshift(plant,"flower")
     print("The plant:",plant)
-    
+
+    for scope in plant:inScopeOf() do
+     plant:pop("water")
+     pop("nutrients")
+     print("The plant:",self) --> plant{"seed","water","nutrients"}
+    end
+
     local tree = object{"branch","leaves"}
     local bush = plant{leaves = "green"}
     
@@ -156,14 +162,17 @@ Usage Example - object:scope example
     for scope in plant:inScopeOf() do
         
      pushScope(tree)
-     print("The tree:",self)    
+
+     insert.first(self,"bark")
+     print("The tree:",self) --> tree{"bark","branch","leaves"}
+
      pushScope(bush)
-     print("The bush:",self)    
+     print("The bush:",self) --> bush{["leaves"] = "green}
      popScope()
      print("The tree:",self)  
      popScope()
         
-     print("The plant:",self,plant == self)
+     print("The plant:",self,plant == self) -- plant{}
         
     end
     
