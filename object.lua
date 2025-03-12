@@ -1,6 +1,6 @@
 -- object.lua - 3.0 - (Beckett Dunning 2014 - 2025) - Object oriented lua programming 
 ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
-local Lib_Version = 3.0 -- object unified environment (dev build) - WIP (3-10-25)
+local Lib_Version = 3.05 -- object unified environment (dev build) - WIP (3-10-25)
 
 -- This script adds an Object Oriented aproach to Lua Programming Calls. Traditionally in lua, there is little notion of inheritance or classes. This script allows for Javascript like progamming calls in chained sequence as opposed to the traditional structure of raw Lua
 
@@ -610,11 +610,127 @@ object.concat = function(self,sep) -- Concantinates table indexies
   local concat = table.concat return concat(self,sep)
  end -- returns: "indexies..sep,... string"
 
-object.type = function(self) -- Gets objects' __type values or type() results
-  if not self then return error("Invalid argument no.1 to object.type().",2) end
-  local meta = getmetatable(self) if meta and meta.__type then return meta.__type 
+---------- -------- ----------
+
+-- Gets objects' __type values or data type
+
+object.type = function(self) 
+    if not self then return error("Invalid argument no.1 to object.type().",2) end
+    local meta = getmetatable(self) if meta and meta.__type then return meta.__type 
     else return type(self) end 
 end -- returns: type string of object
+
+-- Tests if an object is subclass / instance of another object or a data value is a certain type
+
+object.isTypeOf = function(self,...) 
+    
+    local count = select("#",...)
+    if not self then return false end
+    
+    local baseType,argStep = type(self), 1
+    local objType = baseType == "table" and self.type and self:type()
+    local arg = select(argStep,...)
+    
+    local objClass = object:proto()
+    local isOfType = true
+    
+    while true do
+        
+        local argType = type(arg)    
+        
+        -- (object) - object pointer
+        if argType == "table" and baseType == "table" and self._isObject and self._isObject() == true and arg._isObject and arg:_isObject() == true then
+            
+            local proto = self:proto()
+            local match = false
+            
+            if arg == object then
+                match = true        
+                
+            else
+                while proto ~= nil do
+                    if proto == arg then match = true break end  
+                    proto = proto:proto()   
+                end     
+            end
+            
+            isOfType = match and true or false
+            
+            -- (string) - object:type() or type()
+        elseif argType == "string" then
+            if baseType == arg or objType == arg then match = true
+            elseif baseType ~= argType and objType ~= argType then 
+            return false end  
+        end
+        
+        argStep = argStep + 1, true
+        if argStep > count then break end
+        arg = select(argStep,...)
+        
+    end
+    
+    return isOfType 
+    
+end
+
+object.isInstanceOf = object.isTypeOf
+object.isOfType = object.isTypeOf
+
+---------- -------- ----------
+
+-- Binding Methods
+
+-- TBD - Binding to a super which is already part of an object should do nothing. Binding a table to an object should do what? binding an object to an object with the same super should make a multiple inherited object and change the bindee object to this object. The bindees super doesnt directly become the object which it is bound to
+
+object.bind = function(self,...)
+    
+    if object.isObject(self) then return self
+    else return object(self) end
+    
+return end
+
+-- object:bindTo(...)
+
+---------- -------- ----------
+
+-- object.release is going to need to take object.bind
+
+-- object:release with no args - Throw all binding away back to lua table
+-- vararg - Release object bindings from multiple inheritence / supers
+
+object.release = function(self,...)
+    
+    if not self then
+    return error("Invalid argument no.1 to object.release().",2) end
+    local format = type(self)
+    if format ~= "table" or object.isObject(self) == false
+    then return self end
+    
+    setmetatable(self,nil)
+    return self
+    
+end
+
+object.unbind = object.release
+
+-- object:releaseFrom(...)
+
+---------- -------- ----------
+
+-- object super / meta / proto methods
+
+object.meta = function(self) -- Creates object reference to metatable
+    local meta = getmetatable return meta(self)
+end -- returns: object metatable
+
+object.super = function(self) -- Returns super class / prototype of object
+    local meta = getmetatable(self)
+return meta and meta.__proto end 
+
+object.prototype = object.super 
+object.proto = object.super
+
+---------- -------- ----------
 
 object.meta = function(self) -- Creates object reference to metatable
   local meta = getmetatable return meta(self)
@@ -759,6 +875,7 @@ end
 -- (Dynamic Pointer) Store a pointer to be used in 1 as the last if the last is not _G - See step 1
 
 ------ ------ ------ ------
+
 local _getGlobalScope = function()
     
     if _VERSION ~= "Lua 5.1" then
@@ -938,6 +1055,7 @@ end
 -- (object env) - The 'object' global variable space is used to represent the object environment and its methods. The object base class is referenced by the environment's meta.__index.
 
 local meta = getmetatable(object) -- Allows object class to have independent extension instances
+
  setmetatable(_object,{__index = object, __call = meta.__call, 
   __version = meta.version, __type = "object env", __proto = object,
 
@@ -958,7 +1076,6 @@ local meta = getmetatable(object) -- Allows object class to have independent ext
 object = _object; initExtensionLayer(object) -- updates object alias pointer
 
 ---------- ---------- ----------
-
 
 -- Private Class Methods entered after this point ...
 
