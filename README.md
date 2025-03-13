@@ -49,7 +49,7 @@ Note: In the case of object.insert, the key of insert (on the object) is a custo
 
 ---------------
 
-Insertions - (_.insert) custom object - Add data to object
+Insertions: (_.insert) custom object - Add data to object
 
 ```
 object.insert.first / object.unshift
@@ -63,7 +63,7 @@ object.insert.keysFromTable
 
 ------ ------
 
-Removals (_.remove) custom object - Remove data from object
+Removals: (_.remove) custom object - Remove data from object
 
 ```
 object.remove.index
@@ -83,7 +83,7 @@ object.remove.entries
 
 ------ ------
 
-Utility Functions / Methods
+Utility Functions / Methods:
 
 ```
 object.countElements
@@ -109,7 +109,7 @@ object.copy
 
 ------ ------ ------ ------
 
-Chaining - Calls which return an object can be chained
+Chaining: Calls which return an object can be chained
 
 ```lua
 local colors = object()
@@ -118,7 +118,7 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 
 ------ ------ ------ ------
 
-Object Methods - Scope Stack
+Object Methods: Scope Stack
 
 ```
 
