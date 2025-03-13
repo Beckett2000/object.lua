@@ -168,6 +168,7 @@ Usage Example - scope object
      print("The tree:",self) --> tree{"bark","branch","leaves"}
 
      pushScope(bush)
+
      print("The bush:",self) --> bush{["leaves"] = "green}
 
      print(leaves) -- "green"
@@ -175,7 +176,10 @@ Usage Example - scope object
      print(leaves) -- "purple"
 
      popScope()
+
      print("The tree:",self) -- tree{"branch","leaves","bark"}
+     peint(leaves,tree.leaves) -- "purple","purple"
+
      popScope()
         
      print("The plant:",self) -- plant{"seed","water","nutrients"}
@@ -186,7 +190,7 @@ Usage Example - scope object
     print("The bush (out of scope)",self) -- bush{["leaves"]="purple"}
     popScope()
     
-    print("Self - should be nil :)",self)
+    print("Self - should be nil!",self)
 
 ```
 
