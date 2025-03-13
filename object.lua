@@ -1,3 +1,7 @@
+-------------------------------------------
+
+--- Temp: Testing Object Class
+
 -- object.lua - 3.0 - (Beckett Dunning 2014 - 2025) - Object oriented lua programming 
 ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 local Lib_Version = 3.05 -- object unified environment (dev build) - WIP (3-10-25)
@@ -77,6 +81,30 @@ local function isFunctionOrCallableTable(value)
     if valueType == "function" then return true
     elseif valueType ~= "table" then return false end
     return isCallableTable(value)
+end
+
+-- pretty print data value (i.e. table)
+local toStringHandler = function(value)
+
+   local self = value
+   local entries,value,formatK,formatV,meta = {} for k,v in pairs(self) do 
+    formatK,formatV = type(k),type(v) meta = formatV == "table" and getmetatable(v)
+    if formatV == "function" then value = "(lua function)" -- lua function handling
+    elseif formatV == "table" and meta and meta.__type then -- object handling
+     if meta.__tostring then value = tostring(v)
+     elseif meta.__type then value = "("..tostring(meta.__type)..")" end
+    elseif formatV == "table" and meta and meta.__tostring then value = tostring(v) 
+    elseif formatV == "table" then value = "(lua table)" -- lua table handling
+    elseif formatV == "string" then value = '"'..v..'"' else value = tostring(v) end 
+    table.insert(entries,(formatK == "string" and '["'..k..'"]' or tostring(k))..":"..value.."") end
+   table.sort(entries) 
+    
+    local type = tostring(getmetatable(self)).__type or type(self)
+    
+    local stringification = table.concat{"(",type,"):{",table.concat(entries,", "),"}"}
+    
+    return stringification -- sorts entries / returns: descriptor string
+    
 end
 
 ------------ ------------ ------------ ------------ ------------ ------------ ------------ 
@@ -747,6 +775,8 @@ object.copy = function(self) -- Creates a deep copy of object table and metatabl
   return copy 
 end -- Returns: object - copy of object
 
+object.toString = toStringHandler -- Pretty print table / object
+
 ------------------------------------------------------------------
 -- Extra Utility Methods
 
@@ -1052,26 +1082,14 @@ end
 
 ----- ----------- ----------- ----------- ----------- ----------- -----------
 ----------- ----------- -----------  ----------- ----------- ----------- -----------
+
 -- (object env) - The 'object' global variable space is used to represent the object environment and its methods. The object base class is referenced by the environment's meta.__index.
 
 local meta = getmetatable(object) -- Allows object class to have independent extension instances
 
  setmetatable(_object,{__index = object, __call = meta.__call, 
   __version = meta.version, __type = "object env", __proto = object,
-
-  __tostring = function(self) -- converts table to descriptor string
-   local entries,value,formatK,formatV,meta = {} for k,v in pairs(self) do 
-    formatK,formatV = type(k),type(v) meta = formatV == "table" and getmetatable(v)
-    if formatV == "function" then value = "(lua function)" -- lua function handling
-    elseif formatV == "table" and meta and meta.__type then -- object handling
-     if meta.__tostring then value = tostring(v)
-     elseif meta.__type then value = "("..tostring(meta.__type)..")" end
-    elseif formatV == "table" and meta and meta.__tostring then value = tostring(v) 
-    elseif formatV == "table" then value = "(lua table)" -- lua table handling
-    elseif formatV == "string" then value = '"'..v..'"' else value = tostring(v) end 
-    table.insert(entries,(formatK == "string" and '["'..k..'"]' or tostring(k))..":"..value.."") end
-   table.sort(entries) return -- sorts entries / returns: descriptor string
-    "("..tostring(getmetatable(self).__type).."):{"..table.concat(entries,", ").."}" end})
+  __tostring = toStringHandler })
 
 object = _object; initExtensionLayer(object) -- updates object alias pointer
 
