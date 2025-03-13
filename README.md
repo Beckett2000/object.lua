@@ -162,26 +162,26 @@ Usage Example: (object scope)
         
      pushScope(tree)
 
-     print(self) -- tree{"branch","leaves"}
-     print(self[1]) -- "branch"
+      print(self) -- tree{"branch","leaves"}
+      print(self[1]) -- "branch"
 
-     insert.first(self,"bark")
-     print("The tree:",self) --> tree{"bark","branch","leaves"}
+      insert.first(self,"bark")
+      print("The tree:",self) --> tree{"bark","branch","leaves"}
 
-     pushScope(bush)
+      pushScope(bush)
 
-     print("The bush:",self) --> bush{["leaves"] = "green}
+       print("The bush:",self) --> bush{["leaves"] = "green}
 
-     print(leaves) -- "green"
-     self.leaves = "purple"
-     print(leaves) -- "purple"
+       print(leaves) -- "green"
+       self.leaves = "purple"
+       print(leaves) -- "purple"
 
-     popScope()
+      popScope()
 
-     print("The tree:",self) -- tree{"branch","leaves","bark"}
+      print("The tree:",self) -- tree{"branch","leaves","bark"}
 
-     -- Note: These are all reference pointers to the same var.
-     peint(leaves,tree.leaves,self.leaves) -- "purple","purple","purple"
+      -- Note: These are all reference pointers to the same var.
+      print(leaves,tree.leaves,self.leaves) -- "purple","purple","purple"
 
      popScope()
         
