@@ -16,11 +16,11 @@ print("Hello object!")
 
 ------ ------ ------ ------
 
--- Insert / Remove (_.insert, _.remove) - Custom Object Syntax - (prefix)
+Insert / Remove (_.insert, _.remove) - Custom Object Syntax - (prefix)
 
--- These prefix extensions search for the insert or remove prefix when referenced to create custom method call blocks. Using the declaration syntax, subclasses can append custom local methods to these extensions. The usage structure is below:
--- Declaration: object.|insert/remove|Extension IE: object.insertValue
--- Calling Syntax Examples: 
+These prefix extensions search for the insert or remove prefix when referenced to create custom method call blocks. Using the declaration syntax, subclasses can append custom local methods to these extensions. The usage structure is below:
+Declaration: object.|insert/remove|Extension IE: object.insertValue
+Calling Syntax Examples: 
 
 ```
   object:insertValue() 
@@ -109,7 +109,7 @@ object.copy
 
 ------ ------ ------ ------
 
--- Chaining - Calls which return an object can be chained
+Chaining - Calls which return an object can be chained
 
 ```lua
 local colors = object()
@@ -118,20 +118,20 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 
 ------ ------ ------ ------
 
--- Object Methods - Scope Stack
+Object Methods - Scope Stack
 
 ```
 
--- object:inScopeOf() -- Iterator overload - Iterate once and set scope to object implicitly -> local scope becomes object 
+object:inScopeOf() -- Iterator overload - Iterate once and set scope to object implicitly -> local scope becomes object 
 
--- for scope in object:inScopeOf do
--- end
+for scope in object:inScopeOf do
+end
 
--- pushScope() -- Add to array and set dynamic pointer
--- popScope() -- Remove from array and set dynamic pointer
--- (WIP) setScope(scope,bind/reset) - Update Dynamic Pointer
+pushScope() -- Add to array and set dynamic pointer
+popScope() -- Remove from array and set dynamic pointer
+(WIP) setScope(scope,bind/reset) - Update Dynamic Pointer
 
--- (for all) -> returns: scope
+for all) -> returns: scope
 
 ```
 
