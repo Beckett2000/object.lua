@@ -137,7 +137,7 @@ colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
 
 ------ ------ ------ ------
 
-Usage Example - scope object
+Usage Example: (object scope)
 
 ```lua
 
@@ -162,6 +162,7 @@ Usage Example - scope object
         
      pushScope(tree)
 
+     print(self) -- tree{"branch","leaves"}
      print(self[1]) -- "branch"
 
      insert.first(self,"bark")
@@ -178,7 +179,9 @@ Usage Example - scope object
      popScope()
 
      print("The tree:",self) -- tree{"branch","leaves","bark"}
-     peint(leaves,tree.leaves) -- "purple","purple"
+
+     -- Note: These are all reference pointers to the same var.
+     peint(leaves,tree.leaves,self.leaves) -- "purple","purple","purple"
 
      popScope()
         
