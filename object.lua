@@ -1,7 +1,4 @@
--------------------------------------------
-
---- Temp: Testing Object Class
-
+---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 -- object.lua - 3.0 - (Beckett Dunning 2014 - 2025) - Object oriented lua programming 
 ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 local Lib_Version = 3.05 -- object unified environment (dev build) - WIP (3-10-25)
@@ -84,9 +81,32 @@ local function isFunctionOrCallableTable(value)
 end
 
 -- pretty print data value (i.e. table)
-local toStringHandler = function(value)
-
-   local self = value
+local toStringHandler
+toStringHandler = function(...)
+   
+   local argLen = select("#",...)
+     
+   ---- ---- ---- ---- 
+   --- vararg -- get stringifications of multiple arguments
+   if argLen ~= 1 then
+    local stringifications = {}
+    for i = 1,argLen do
+     local arg = select(i,...)
+     table.insert(stringifications,
+      #stringifications + 1,toStringHandler(arg)) end    
+      return table.concat(stringifications,", ")
+    end
+    ---- ---- ---- -----
+   
+   local self = select(1,...)
+   local format = type(self)
+    
+    if format ~= "table" then
+      return self
+    end
+    
+    ---- ---- ---- ---- 
+    
    local entries,value,formatK,formatV,meta = {} for k,v in pairs(self) do 
     formatK,formatV = type(k),type(v) meta = formatV == "table" and getmetatable(v)
     if formatV == "function" then value = "(lua function)" -- lua function handling
@@ -99,7 +119,7 @@ local toStringHandler = function(value)
     table.insert(entries,(formatK == "string" and '["'..k..'"]' or tostring(k))..":"..value.."") end
    table.sort(entries) 
     
-    local type = tostring(getmetatable(self)).__type or type(self)
+    local type = tostring(getmetatable(self)).__type or format == "table" and tostring(table) or format
     
     local stringification = table.concat{"(",type,"):{",table.concat(entries,", "),"}"}
     
@@ -1103,7 +1123,7 @@ object = _object; initExtensionLayer(object) -- updates object alias pointer
 --[[
 function iter(self)
     local env,step = _ENV or _G, 0
-    return function() step =step + 1
+    return function() step = step + 1
         if step == 1 then local a = getScope(self) _ENV = a return a
         else _ENV = env return end
     end
@@ -1112,4 +1132,6 @@ end
 
 -- return object
 
+----- ----------- ----------- ----------- ----------- ----------- -----------
+-- {{ File End - object.lua }}
 ----- ----------- ----------- ----------- ----------- ----------- -----------
