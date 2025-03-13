@@ -142,16 +142,17 @@ Usage Example - scope object
 ```lua
 
     local plant = object{"seed"}
-    object.unshift(plant,"flower")
+    object.unshift(plant,"flower") -- plant{"flower","seed"}
     print("The plant:",plant)
+    plant:shift()
 
     for scope in plant:inScopeOf() do
      plant:push("water")
      push("nutrients")
-     print("The plant:",self) --> plant{"seed","water","nutrients"}
+     print("The plant:",self) -- plant{"seed","water","nutrients"}
     end
 
-    local tree = object{"branch","leaves"}
+    local tree = plant{"branch","leaves"}
     local bush = plant{leaves = "green"}
     
     bush:pushScope()
@@ -161,23 +162,31 @@ Usage Example - scope object
         
      pushScope(tree)
 
+     print(self[1]) -- "branch"
+
      insert.first(self,"bark")
      print("The tree:",self) --> tree{"bark","branch","leaves"}
 
      pushScope(bush)
      print("The bush:",self) --> bush{["leaves"] = "green}
+
+     print(leaves) -- "green"
+     self.leaves = "purple"
+     print(leaves) -- "purple"
+
      popScope()
-     print("The tree:",self)  
+     print("The tree:",self) -- tree{"branch","leaves","bark"}
      popScope()
         
-     print("The plant:",self,plant == self) -- plant{}
-        
+     print("The plant:",self) -- plant{"seed","water","nutrients"}
+     print(plant == self) --> true
+
     end
     
-    print("The bush (out of scope)",self)
+    print("The bush (out of scope)",self) -- bush{["leaves"]="purple"}
     popScope()
     
-    print("Self - (should be nil) :)",self)
+    print("Self - should be nil :)",self)
 
 ```
 
