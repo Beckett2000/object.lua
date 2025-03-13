@@ -105,6 +105,8 @@ object.isTypeOf
 object.meta
 object.super
 object.copy
+object.toString
+
 ```
 
 ------ ------ ------ ------
