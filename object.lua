@@ -102,7 +102,7 @@ toStringHandler = function(...)
    local format = type(self)
     
     if format ~= "table" then
-      return self
+      return self and self or "nil"
     end
     
     ---- ---- ---- ---- 
