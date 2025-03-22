@@ -18,7 +18,7 @@ local meta = {__index = self, __type = "object class", __version = Lib_Version,
     __call = function(self,...) -- creates object class from initializer
     return -- self.init and self:init(...) or 
     self:new(...) end } 
-    setmetatable(meta,{__utype = "object meta", __index = object }) setmetatable(object,meta)
+    setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
     
 -- Local variable declaration for speed improvement
 local type,pairs,table,unpack,setmetatable,getmetatable,getfenv,setfenv,object = 
