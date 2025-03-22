@@ -1,12 +1,17 @@
----------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+-------------------------------------------
 -- object.lua - 3.0 - (Beckett Dunning 2014 - 2025) - Object oriented lua programming 
 ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+
 local Lib_Version = 3.05 -- object unified environment (dev build) - WIP (3-10-25)
 
 -- This script adds an Object Oriented aproach to Lua Programming Calls. Traditionally in lua, there is little notion of inheritance or classes. This script allows for Javascript like progamming calls in chained sequence as opposed to the traditional structure of raw Lua
 
+----- ----- ----- ----- ----- -----
+-- if true then return end -- blocks the code from running
+----- ----- ----- ----- ----- -----
+
 object,libs = {},{} local _object,object = object,{} -- aliases object class / stores libraries
-local meta = {__index = self,__type = "object class", __version = Lib_Version,
+local meta = {__index = self, __type = "object class", __version = Lib_Version,
     __tostring = function(self) -- gives objects a tostring native behavior
     local vals = {} for k,_ in pairs(self) do table.insert(vals,tostring(k)) end
     table.sort(vals) return "(object baseClass):["..table.concat(vals,", ").."]" end,
@@ -81,32 +86,17 @@ local function isFunctionOrCallableTable(value)
 end
 
 -- pretty print data value (i.e. table)
-local toStringHandler
-toStringHandler = function(...)
-   
-   local argLen = select("#",...)
-     
-   ---- ---- ---- ---- 
-   --- vararg -- get stringifications of multiple arguments
-   if argLen ~= 1 then
-    local stringifications = {}
-    for i = 1,argLen do
-     local arg = select(i,...)
-     table.insert(stringifications,
-      #stringifications + 1,toStringHandler(arg)) end    
-      return table.concat(stringifications,", ")
-    end
-    ---- ---- ---- -----
-   
-   local self = select(1,...)
-   local format = type(self)
+local toStringHandler = function(value)
     
-    if format ~= "table" then
-      return self and self or "nil"
-    end
+    local isObject = object._isObject(value)
+
+    ---- --- ---- --- ---- --- ----
+    -- In case of debugging -> use / uncomment this next line ...
     
-    ---- ---- ---- ---- 
+    -- if isObject then return "nil" end
+    ---- --- ---- --- ---- --- ----
     
+   local self = value
    local entries,value,formatK,formatV,meta = {} for k,v in pairs(self) do 
     formatK,formatV = type(k),type(v) meta = formatV == "table" and getmetatable(v)
     if formatV == "function" then value = "(lua function)" -- lua function handling
@@ -119,7 +109,29 @@ toStringHandler = function(...)
     table.insert(entries,(formatK == "string" and '["'..k..'"]' or tostring(k))..":"..value.."") end
    table.sort(entries) 
     
-    local type = tostring(getmetatable(self)).__type or format == "table" and tostring(table) or format
+    ---- --- ---- --- ---- --- ----
+    
+    local rawType = type(self)
+    local isTable = rawType == "table" or rawString == "table"
+    local type = not isTable and rawType or (isObject and object.type(self)) or tostring(self)
+    
+     ---- --- ---- --- ---- --- ----
+    
+     if isObject then
+        
+      local meta = self:meta()
+      setmetatable(self,nil) -- bind
+    
+       local rawString = tostring(self)
+        local offset = string.match(rawString,"0x%x+")
+       local objNotation = {type,offset}
+       type = table.concat(objNotation," : ")
+        
+      setmetatable(self,meta) -- unbind
+        
+     end
+    
+    ---- --- ---- --- ---- --- ----
     
     local stringification = table.concat{"(",type,"):{",table.concat(entries,", "),"}"}
     
@@ -199,7 +211,7 @@ end
 local function getExtStore(self) -- (private) points to / creates object.ext store
     local target,ext 
     if self ~= object then -- stores extensions in __exIndex of metatable
-        local layer,meta = getExtensionIndex(self),getmetatable(self)      
+        local layer,meta = getExtensionIndex(self),getmetatable(self)  
         target,ext = layer, meta.__proto and meta.__proto._ext or nil
         
     else target,ext = self,self._ext end -- stores extensions in self 
@@ -366,7 +378,7 @@ setmetatable(object._ext,extMeta)
 -- object.init = function(self) end -- Called upon object initiation
 
 object.new = function(super,self) -- (object) - base constructor 
-    local meta,superMeta = {},getmetatable(super) meta.__index = super == object and superMeta.__proto or super
+    local meta,superMeta = {__type = "object"},getmetatable(super) meta.__index = super == object and superMeta.__proto or super
     
     -- Note (3-9-25): meta.__proto used to be set to meta.__index. This was changed to meta.__index = super. This may have unexpected effects in classes which use object (see below)
     
@@ -1096,9 +1108,29 @@ end
 ----- ----------- ----------- -----------
 -- private methods below this point
 
-object._isObject = function()
+object._isObject = function(self)
+    
+    if type(self) ~= "table" then return false end
+    local meta = getmetatable(self)
+    if not meta then return false end
+    if meta.__type ~= "object" then return true end
+    
+    local proto
+    if meta.__index then
+        while proto do
+            if proto == object then 
+                break 
+            end
+            proto = meta.__index
+        end
+    end
+    
     return true
+    
 end
+
+----- ----------- ----------- -----------
+
 
 ----- ----------- ----------- ----------- ----------- ----------- -----------
 ----------- ----------- -----------  ----------- ----------- ----------- -----------
@@ -1121,16 +1153,20 @@ object = _object; initExtensionLayer(object) -- updates object alias pointer
 ----- ----------- ----------- ----------- ----------- ----------- -----------
 
 --[[
+
 function iter(self)
     local env,step = _ENV or _G, 0
-    return function() step = step + 1
+    return function() step =step + 1
         if step == 1 then local a = getScope(self) _ENV = a return a
         else _ENV = env return end
     end
 end
+
 ]]
 
 -- return object
+
+----- ----------- ----------- ----------- ----------- ----------- -----------
 
 ----- ----------- ----------- ----------- ----------- ----------- -----------
 -- {{ File End - object.lua }}
