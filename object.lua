@@ -18,7 +18,7 @@ local meta = {__index = self, __type = "object class", __version = Lib_Version,
     __call = function(self,...) -- creates object class from initializer
     return -- self.init and self:init(...) or 
     self:new(...) end } 
-    setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
+    setmetatable(meta,{__utype = "object meta", __index = object }) setmetatable(object,meta)
     
 -- Local variable declaration for speed improvement
 local type,pairs,table,unpack,setmetatable,getmetatable,getfenv,setfenv,object = 
@@ -88,7 +88,7 @@ end
 -- pretty print data value (i.e. table)
 local toStringHandler = function(value)
     
-    local isObject = object._isObject(value)
+    local isObject = object.isObject(value)
 
     ---- --- ---- --- ---- --- ----
     -- In case of debugging -> use / uncomment this next line ...
@@ -125,7 +125,7 @@ local toStringHandler = function(value)
        local rawString = tostring(self)
         local offset = string.match(rawString,"0x%x+")
        local objNotation = {type,offset}
-       type = table.concat(objNotation," : ")
+       type = table.concat(objNotation,": ")
         
       setmetatable(self,meta) -- unbind
         
@@ -136,6 +136,8 @@ local toStringHandler = function(value)
     local stringification = table.concat{"(",type,"):{",table.concat(entries,", "),"}"}
     
     return stringification -- sorts entries / returns: descriptor string
+    
+    ---- --- ---- --- ---- --- ----
     
 end
 
@@ -699,7 +701,7 @@ object.isTypeOf = function(self,...)
         local argType = type(arg)    
         
         -- (object) - object pointer
-        if argType == "table" and baseType == "table" and self._isObject and self._isObject() == true and arg._isObject and arg:_isObject() == true then
+        if argType == "table" and baseType == "table" and self.isObject and self.isObject() == true and arg.isObject and arg:isObject() == true then
             
             local proto = self:proto()
             local match = false
@@ -792,6 +794,28 @@ object.proto = object.super
 
 ---------- -------- ----------
 
+--[[
+
+-- TBD - Think about if this is useful or redundant
+
+object.closest = function(self,object)
+    
+  local isObject = object.isObject(self)
+  if type(self) ~= "table" or not object.isObject(self) then return nil end
+  
+  if isObject then 
+   local meta = object:meta()
+   while(meta) do
+    if meta == object then return true end
+    meta = object:meta()
+    end
+   end
+end
+
+]]
+
+ ---------- -------- ----------
+
 object.meta = function(self) -- Creates object reference to metatable
   local meta = getmetatable return meta(self)
  end -- returns: object metatable
@@ -838,7 +862,7 @@ local function _formatScopeVar(self,key,var)
     if format == "number" or format == "string" or (format == "table" and var._isPrefix == true) then return var     
     end
     
-    if (_objectConfig.implicitSelf == true or _implicitSelfObj ~= nil) and format == "function" and (type(self) == "table" and self[key] ~= nil and self._isObject() == true) then
+    if (_objectConfig.implicitSelf == true or _implicitSelfObj ~= nil) and format == "function" and (type(self) == "table" and self[key] ~= nil and self.isObject() == true) then
         
         ------- ------- ------- -------
         -- Adds a wrapped callback for _ext nethods passing implicit self
@@ -1108,7 +1132,7 @@ end
 ----- ----------- ----------- -----------
 -- private methods below this point
 
-object._isObject = function(self)
+object.isObject = function(self)
     
     if type(self) ~= "table" then return false end
     local meta = getmetatable(self)
