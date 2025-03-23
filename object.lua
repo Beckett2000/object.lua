@@ -1,10 +1,10 @@
--------------------------------------------
+---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 -- object.lua - 3.0 - (Beckett Dunning 2014 - 2025) - Object oriented lua programming 
 ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
 
 local Lib_Version = 3.05 -- object unified environment (dev build) - WIP (3-10-25)
 
--- This script adds an Object Oriented aproach to Lua Programming Calls. Traditionally in lua, there is little notion of inheritance or classes. This script allows for Javascript like progamming calls in chained sequence as opposed to the traditional structure of raw Lua
+-- This class adds a base (object) sub class which can be used to expose certain data manipulation methods to a table value print(object{"foo","bar"}) -> object
 
 ----- ----- ----- ----- ----- -----
 -- if true then return end -- blocks the code from running
@@ -18,7 +18,7 @@ local meta = {__index = self, __type = "object class", __version = Lib_Version,
     __call = function(self,...) -- creates object class from initializer
     return -- self.init and self:init(...) or 
     self:new(...) end } 
-    setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
+    setmetatable(meta,{__utype = "object meta", __index = object }) setmetatable(object,meta)
     
 -- Local variable declaration for speed improvement
 local type,pairs,table,unpack,setmetatable,getmetatable,getfenv,setfenv,object = 
@@ -87,7 +87,7 @@ end
 
 -- pretty print data value (i.e. table)
 local toStringHandler = function(value)
-    
+
     local isObject = object.isObject(value)
 
     ---- --- ---- --- ---- --- ----
@@ -107,9 +107,8 @@ local toStringHandler = function(value)
     elseif formatV == "table" then value = "(lua table)" -- lua table handling
     elseif formatV == "string" then value = '"'..v..'"' else value = tostring(v) end 
     table.insert(entries,(formatK == "string" and '["'..k..'"]' or tostring(k))..":"..value.."") end
-   table.sort(entries) 
-    
-    ---- --- ---- --- ---- --- ----
+
+    table.sort(entries) 
     
     local rawType = type(self)
     local isTable = rawType == "table" or rawString == "table"
@@ -135,11 +134,17 @@ local toStringHandler = function(value)
     
     local stringification = table.concat{"(",type,"):{",table.concat(entries,", "),"}"}
     
-    return stringification -- sorts entries / returns: descriptor string
+     if count ~= 1 then 
+      return stringification
+            
+     else  table.insert(strings,stringification)
+     end
     
     ---- --- ---- --- ---- --- ----
     
-end
+end -- sorts entries / returns: descriptor string
+
+------------ ------------
 
 ------------ ------------ ------------ ------------ ------------ ------------ ------------ 
 -- Object Extension Module :init() - (object:ext()) ----------- ----------- ---------
@@ -831,7 +836,28 @@ object.copy = function(self) -- Creates a deep copy of object table and metatabl
   return copy 
 end -- Returns: object - copy of object
 
-object.toString = toStringHandler -- Pretty print table / object
+------------------------------------------------------------------
+
+object.toString = function(...) -- Pretty print table / object
+    
+    local count = select("#",...)
+    local strings = {}
+    
+    ---- ------ ------
+    
+    for i = 1, count do
+     local string = toStringHandler(select(i,...))
+     if count == 1 then return string end
+      table.insert(strings,string)
+    end
+    
+    ---- ------ ------
+    
+    if count ~= 1 then return 
+     table.unpack(strings) 
+    end
+    
+end
 
 ------------------------------------------------------------------
 -- Extra Utility Methods
