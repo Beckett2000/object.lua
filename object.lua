@@ -18,7 +18,7 @@ local meta = {__index = self, __type = "object class", __version = Lib_Version,
     __call = function(self,...) -- creates object class from initializer
     return -- self.init and self:init(...) or 
     self:new(...) end } 
-    setmetatable(meta,{__type= "object meta", __index = object }) setmetatable(object,meta)
+    setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
     
 -- Local variable declaration for speed improvement
 local type,pairs,table,unpack,setmetatable,getmetatable,getfenv,setfenv,object = 
@@ -67,6 +67,7 @@ local _objectConfig = {
 -- Holds implicit self pointer ref. (see _objectConfig.implicitSelf)
 
 local _implicitSelfObj = nil 
+local _isObject 
 
 ------------ ------------ ------------ 
 
@@ -85,10 +86,10 @@ local function isFunctionOrCallableTable(value)
     return isCallableTable(value)
 end
 
--- pretty print data value (i.e. table)
+-- pretty print data value(s) (i.e. table)
 local toStringHandler = function(value)
 
-    local isObject = object.isObject(value)
+    local isObject = _isObject(value)
 
     ---- --- ---- --- ---- --- ----
     -- In case of debugging -> use / uncomment this next line ...
@@ -97,8 +98,14 @@ local toStringHandler = function(value)
     ---- --- ---- --- ---- --- ----
     
    local self = value
-   local entries,value,formatK,formatV,meta = {} for k,v in pairs(self) do 
-    formatK,formatV = type(k),type(v) meta = formatV == "table" and getmetatable(v)
+   local entries,value,formatK,formatV,meta = {} 
+    
+   for k,v in pairs(self) do 
+    
+    formatK,formatV = type(k),type(v) 
+    k = formatK == "number" and k < 10 and "0"..k or k
+        
+    meta = formatV == "table" and getmetatable(v)
     if formatV == "function" then value = "(lua function)" -- lua function handling
     elseif formatV == "table" and meta and meta.__type then -- object handling
      if meta.__tostring then value = tostring(v)
@@ -107,14 +114,16 @@ local toStringHandler = function(value)
     elseif formatV == "table" then value = "(lua table)" -- lua table handling
     elseif formatV == "string" then value = '"'..v..'"' else value = tostring(v) end 
     table.insert(entries,(formatK == "string" and '["'..k..'"]' or tostring(k))..":"..value.."") end
-
-    table.sort(entries) 
+    
+    ---- --- ---- --- ---- --- ----
+    -- table vs. object handling
     
     local rawType = type(self)
     local isTable = rawType == "table" or rawString == "table"
     local type = not isTable and rawType or (isObject and object.type(self)) or tostring(self)
     
      ---- --- ---- --- ---- --- ----
+     -- object handling
     
      if isObject then
         
@@ -131,6 +140,7 @@ local toStringHandler = function(value)
      end
     
     ---- --- ---- --- ---- --- ----
+    -- output to serial
     
     local stringification = table.concat{"(",type,"):{",table.concat(entries,", "),"}"}
     
@@ -142,7 +152,7 @@ local toStringHandler = function(value)
     
     ---- --- ---- --- ---- --- ----
     
-end -- sorts entries / returns: descriptor string
+end --> returns: serial descriptor string
 
 ------------ ------------
 
@@ -706,7 +716,7 @@ object.isTypeOf = function(self,...)
         local argType = type(arg)    
         
         -- (object) - object pointer
-        if argType == "table" and baseType == "table" and self.isObject and self.isObject() == true and arg.isObject and arg:isObject() == true then
+        if argType == "table" and baseType == "table" and self.isObject and self.isObject() == true and _isObject(arg) then
             
             local proto = self:proto()
             local match = false
@@ -751,7 +761,7 @@ object.isOfType = object.isTypeOf
 
 object.bind = function(self,...)
     
-    if object.isObject(self) then return self
+    if _isObject(self) then return self
     else return object(self) end
     
 return end
@@ -770,7 +780,7 @@ object.release = function(self,...)
     if not self then
     return error("Invalid argument no.1 to object.release().",2) end
     local format = type(self)
-    if format ~= "table" or object.isObject(self) == false
+    if format ~= "table" or _isObject(self) == false
     then return self end
     
     setmetatable(self,nil)
@@ -805,8 +815,8 @@ object.proto = object.super
 
 object.closest = function(self,object)
     
-  local isObject = object.isObject(self)
-  if type(self) ~= "table" or not object.isObject(self) then return nil end
+  local isObject = _isObject(self)
+  if type(self) ~= "table" or not _isObject(self) then return nil end
   
   if isObject then 
    local meta = object:meta()
@@ -1158,7 +1168,7 @@ end
 ----- ----------- ----------- -----------
 -- private methods below this point
 
-object.isObject = function(self)
+_isObject = function(self)
     
     if type(self) ~= "table" then return false end
     local meta = getmetatable(self)
@@ -1178,8 +1188,6 @@ object.isObject = function(self)
     return true
     
 end
-
------ ----------- ----------- -----------
 
 
 ----- ----------- ----------- ----------- ----------- ----------- -----------
