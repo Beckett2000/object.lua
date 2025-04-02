@@ -1,31 +1,47 @@
 -------------------------------------------
--- object.lua - 3.0 - (Beckett Dunning 2014 - 2025) - Object oriented lua programming 
----------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+-- object.lua - 3.06 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-2-25)
+-------------------------------------------
 
-local Lib_Version = 3.05 -- object unified environment (dev build) - WIP (3-10-25)
+-- This class adds a base (object) sub class which can be used to expose certain data manipulation methods to a table value 
 
--- This class adds a base (object) sub class which can be used to expose certain data manipulation methods to a table value print(object{"foo","bar"}) -> object
+-- local tree = object{}
+-- tree.insert:first("foo"):push("bar")
+-- print(tree) -- -> {"foo","bar"}
+
+-------------------------------------------
 
 ----- ----- ----- ----- ----- -----
 -- if true then return end -- blocks the code from running
 ----- ----- ----- ----- ----- -----
 
-object,libs = {},{} local _object,object = object,{} -- aliases object class / stores libraries
-local meta = {__index = self, __type = "object class", __version = Lib_Version,
-    __tostring = function(self) -- gives objects a tostring native behavior
-    local vals = {} for k,_ in pairs(self) do table.insert(vals,tostring(k)) end
-    table.sort(vals) return "(object baseClass):["..table.concat(vals,", ").."]" end,
-    __call = function(self,...) -- creates object class from initializer
-    return -- self.init and self:init(...) or 
-    self:new(...) end } 
-    setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
-    
--- Local variable declaration for speed improvement
+-- Local variable declaration for speed improvements
 local type,pairs,table,unpack,setmetatable,getmetatable,getfenv,setfenv,object = 
 type,pairs,table,table.unpack,setmetatable,getmetatable,getfenv,setfenv,object
 local abs,pi,cos,min,max,pow,acos,floor,sqrt = math.abs,math.pi,math.cos,
 math.min,math.max, math.pow,math.acos,math.floor,math.sqrt
+
+----- ----- ----- ----- ----- -----
+
+if not object then
     
+  object = {
+    libs = {}, 
+    _initial = {
+      global = _ENV, 
+      pointer = function() end}, 
+    stack = {}
+  }
+    
+end
+
+----- ----- ----- ----- ----- -----
+
+local _object,object,libs,initial,stack = 
+ object,{},object.libs,object._initial,
+ object._stack
+
+----- ----- ----- ----- ----- -----
+
 -- accepted metatable keys to be parsed from object
 local meta_tables,meta_ext = { __index = true, __tostring = true,  __newindex = true, __call = true, __add = true, __sub = true, __mul = true, __div = true, __unm = true, __concat = true, __len = true, __eq = true, __lt = true, __le = true}, { __type = true, __version = true, __namespace = true}
 
@@ -71,6 +87,29 @@ local _isObject
 
 ------------ ------------ ------------ 
 
+local meta = {__index = self, __type = "object class", __version = Lib_Version,
+    __tostring = function(self) -- gives objects a tostring native behavior
+        local vals = {} for k,_ in pairs(self) do table.insert(vals,tostring(k)) end
+    table.sort(vals) return "(object baseClass):["..table.concat(vals,", ").."]" end,
+    __call = function(self,...) -- creates object class from initializer
+        return -- self.init and self:init(...) or 
+    self:new(...) end } 
+setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
+
+------------ ------------ ------------ 
+
+local __ENV = _ENV
+
+object.setenv = function(env)
+    env.object = object
+    __ENV = env
+end
+
+object.getenv = function()
+    return __ENV
+end
+
+------------ ------------ ------------ 
 -- Helper Functions
 
 local function isCallableTable(value)
@@ -86,7 +125,9 @@ local function isFunctionOrCallableTable(value)
     return isCallableTable(value)
 end
 
--- pretty print data value(s) (i.e. table)
+------------ ------------ ------------ 
+
+-- serial - pretty print data value(s)
 local toStringHandler = function(value)
 
     local isObject = _isObject(value)
@@ -99,6 +140,9 @@ local toStringHandler = function(value)
     
    local self = value
    local entries,value,formatK,formatV,meta = {} 
+    
+   ---- --- ---- --- ---- --- ----
+   -- data value stringification
     
    for k,v in pairs(self) do 
     
@@ -414,21 +458,28 @@ object.new = function(super,self) -- (object) - base constructor
     end
     
     setmetatable(self,meta) initExtensionLayer(self) -- creates and initializes object meta
+    
 return self end -- returns: new object instance
 
 -------------------- -------------------- --------------------     
 -- (_.insert, _.remove) - Prefix Block Extensions
 ------------------- - -------------------- --------------------     
--- These hardcoded prefix extensions search for the insert or remove prefix when referenced to create custom method call blocks. Using the declaration syntax, subclasses can append custom local methods to these extensions. The usage structure is below:
+
+-- These prefix extensions search for the insert or remove prefix when referenced to create custom method call blocks. Using the declaration syntax, subclasses can append custom local methods to these extensions. The usage structure is below:
+
 -- Declaration: object.|insert/remove|Extension IE: object.insertValue
 -- Calling Examples: object:insertValue() object.insert:Value() object:insert():Value() 
--------------------- -------------------- --------------------     
-
-object:_ext():_prefix().remove = table.remove; object:_ext():_prefix().insert = table.insert
 
 -- object:_extPreix().remove = table.remove; object:_extPrefix().insert = table.insert
 
+-------------------- --------------------
+-------------------- --------------------
+
 -- object.insert|...| -- These functions are used to add data to the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:insert() block call connections -> object:insert():First(values):Last(values).
+
+object:_ext():_prefix().insert = table.insert
+
+-------------------- --------------------
 
 object.insert.First = function(self,value,...) -- adds values to beginning of table
     local capacity = 0 if value then -- adds first value to table
@@ -484,7 +535,11 @@ object.insert.KeysFromTable = function(self,source,overwrite) -- inserts keys fr
 
 ---- ------ -------- ---------- --------
 
--- object.remove|...| -- These functions are used to remove data from the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:remove() 
+-- object.remove|...| -- These functions are used to remove data from the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:remove()
+    
+object:_ext():_prefix().remove = table.remove; 
+
+---- ------ -------- ---------- --------
 
 object.remove.Index = function(self,index) -- bridged for table.remove method
 return table.remove(self,index) end -- returns: table.remove output
@@ -637,14 +692,20 @@ object.keys = function(self) -- gets keys of an object
         keys[pos],index = index,next(self,index) pos = pos + 1 end
 return keys end -- returns: array of table keys
 
--- (_:first) Prefix - returns firsts in calling
--------------------- -------------------- --------------------     
+-------- -------- -------- -------- 
+-- object.first|...| Prefix 
+-------- -------- -------- -------- 
+
 object.first = function(self,number) -- gets first element(s) of object
     if not number or number == 1 then return self[1] else local val,out = abs(number),{}
         for i = 1,val do if self[i] then out[i] = self[i] else break end end 
     return unpack(out) end end -- returns: vararg of entries
 
-object.firstIndexOf = function(self,val,...) -- finds first numerical indexies of args
+--- first: _object.first ------ ------
+object:_ext():_prefix().first = object.first
+-------- -------- -------- -------- 
+
+object.first.IndexOf = function(self,val,...) -- finds first numerical indexies of args
     if select("#",...) == 0 then for index = 1,#self do -- handles one index query
             if self[index] == val then return index end end return nil -- returns: first index o
     else local values,target,val,found = {val,...} local max = #values -- handles multiple index queries
@@ -652,20 +713,39 @@ object.firstIndexOf = function(self,val,...) -- finds first numerical indexies o
                     values[i] = index found = true break end end if not found then values[i] = nil end end
     return unpack(values,1,max) end end -- returns: vararg of index numbers or nils
 
--- (_:last) Prefix - returns lasts in calling
--------------------- -------------------- --------------------     
+-------- -------- -------- -------- 
+-- object.last|...|  Prefix
+-------- -------- -------- -------- 
+
 object.last = function(self,number) -- gets last element(s) of object
     if not number or number == 1 then return self[#self] else local val,out,max = abs(number),{},#self
         for i = max, (max + 1) - val, -1 do if self[i] then out[(max + 1) - i] = self[i] else break end end 
     return unpack(out) end end -- returns: vararg of entries
 
-object.lastIndexOf = function(self,val,...) -- finds last numerical indexies of args
+--- last: _object.last ------ ------
+object:_ext():_prefix().last = object.last
+-------- -------- -------- 
+
+object.last.IndexOf = function(self,val,...) -- finds last numerical indexies of args
     if select("#",...) == 0 then for index = #self,1,-1 do -- handles one index query
             if self[index] == val then return index end end return nil -- returns: last indes of val
     else local values,target,val,found = {val,...} local max = #values -- handles multiple index queries
         for i = 1,max do val = values[i] found = false for index = #self,1,-1 do if self[index] == val then 
                     values[i] = index found = true break end end if not found then values[i] = nil end end
     return unpack(values,1,max) end end -- returns: vararg of index numbers or nils
+
+-------- -------- -------- -------- 
+-- object.copy|...| -- TODO Prefix
+-------- -------- -------- --------
+
+object.copy = function(self) -- Creates a deep copy of object table and metatable
+    local meta,metaFm,copy = {}, getmetatable(self) or {},{} for k,v in pairs(metaFm) do meta[k] = v end
+    for key,value in pairs(self) do if type(value) ~= "table" then copy[key] = value
+        else copy[key] = object.copy(value) end end setmetatable(copy,meta) 
+    return copy 
+end -- Returns: object - copy of object
+
+-------- -------- -------- -------- 
 
 --[[object:ext():prefix().copy = function(self,layers,layersM) -- 
 local meta,out,rep = getmetatable(self),{},1
@@ -675,8 +755,9 @@ object:copy(0,0)
 object.copy:Keys() object.copy:Hash() object.copy:Indexies() object.copy:Meta()
 ]]
 
+-------- -------- -------- -------- 
 -- Object Status / Configuration Methods
--------- -------- -------- -------- -------- -------- -------- --------
+-------- -------- -------- -------- 
 
 object.inverseIndexies = function(self) -- Inverses numerical indexies of array
   local pos = 0 for i = #self,1,-1 do i = i + pos self:insert(pos + 1, self:remove(i)) 
@@ -733,7 +814,7 @@ object.isTypeOf = function(self,...)
             
             isOfType = match and true or false
             
-            -- (string) - object:type() or type()
+        -- (string) - object:type() or type()
         elseif argType == "string" then
             if baseType == arg or objType == arg then match = true
             elseif baseType ~= argType and objType ~= argType then 
@@ -794,21 +875,6 @@ object.unbind = object.release
 
 ---------- -------- ----------
 
--- object super / meta / proto methods
-
-object.meta = function(self) -- Creates object reference to metatable
-    local meta = getmetatable return meta(self)
-end -- returns: object metatable
-
-object.super = function(self) -- Returns super class / prototype of object
-    local meta = getmetatable(self)
-return meta and meta.__proto end 
-
-object.prototype = object.super 
-object.proto = object.super
-
----------- -------- ----------
-
 --[[
 
 -- TBD - Think about if this is useful or redundant
@@ -829,7 +895,7 @@ end
 
 ]]
 
- ---------- -------- ----------
+---------- -------- ----------
 
 object.meta = function(self) -- Creates object reference to metatable
   local meta = getmetatable return meta(self)
@@ -839,14 +905,7 @@ object.super = function(self) -- Returns super class / prototype of object
   return getmetatable(self).__proto end 
 object.prototype = object.super -- alias for object.super
 
-object.copy = function(self) -- Creates a deep copy of object table and metatable
-  local meta,metaFm,copy = {}, getmetatable(self) or {},{} for k,v in pairs(metaFm) do meta[k] = v end
-  for key,value in pairs(self) do if type(value) ~= "table" then copy[key] = value
-  else copy[key] = object.copy(value) end end setmetatable(copy,meta) 
-  return copy 
-end -- Returns: object - copy of object
-
-------------------------------------------------------------------
+---------- -------- ----------
 
 object.toString = function(...) -- Pretty print table / object
     
@@ -868,6 +927,10 @@ object.toString = function(...) -- Pretty print table / object
     end
     
 end
+
+-- Note / TBD: This could only work outside of an object scope
+
+-- object.tostring = object.toString
 
 ------------------------------------------------------------------
 -- Extra Utility Methods
@@ -1001,7 +1064,9 @@ end
 local _getGlobalScope = function()
     
     if _VERSION ~= "Lua 5.1" then
-      local scope = _ENV or _G
+      local scope = initial.global
+      print("This is the scope:",scope)
+      if not scope then scope = _ENV end
       return scope
     else return _G end
     
@@ -1063,6 +1128,8 @@ if _VERSION == "Lua 5.1" then -- manipulates scope in versions prior to lua 5.2
 elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" then -- manipulates scope in lua 5.2 / 5.3 / 5.4
     
    -- Iterators (for (values) in (iterator) do) ---------- -------- 
+
+   -- TODO - upvalue stack from scope?
     
    object.inScopeOf = function(self)
     local env,step = _getGlobalScope(), 0
@@ -1092,10 +1159,20 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
      local environment = step == 1 and self:getScope() or env;
      local meta = getmetatable(self)
             
-     if foundEnv then debug.setupvalue(scopeWrapper,foundIndex,environment); 
+     if foundEnv then 
+                
+       -----------
+       -- This is the point where you change the upvalue - disable for debugging broken loops     
+      debug.setupvalue(scopeWrapper,foundIndex,environment);
+                
+       -- _ENV = environment
+                
+       ------------
+
       meta.__inScope = true end
 
      -- else _ENV = a end
+            
 --[[
      for key,value in pairs(environment) do print("key:",key,"value:",value) end
       print("This is the environment:",environment)
@@ -1189,7 +1266,6 @@ _isObject = function(self)
     
 end
 
-
 ----- ----------- ----------- ----------- ----------- ----------- -----------
 ----------- ----------- -----------  ----------- ----------- ----------- -----------
 
@@ -1208,7 +1284,6 @@ object = _object; initExtensionLayer(object) -- updates object alias pointer
 -- Private Class Methods entered after this point ...
 
 ----------- ----------- ------ ----- ----------- ----------- ----------- -----------
------ ----------- ----------- ----------- ----------- ----------- -----------
 
 --[[
 
@@ -1222,9 +1297,11 @@ end
 
 ]]
 
--- return object
+----- ----------- ----------- -----------
 
------ ----------- ----------- ----------- ----------- ----------- -----------
+-- print("(object) was loaded ...", object)
+
+return object
 
 ----- ----------- ----------- ----------- ----------- ----------- -----------
 -- {{ File End - object.lua }}
