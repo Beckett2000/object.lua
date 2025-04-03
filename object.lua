@@ -2,6 +2,9 @@
 -- object.lua - 3.06 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-2-25)
 -------------------------------------------
 
+-- local value = object() / object.new()
+-- print("Hello object!")
+
 -- This class adds a base (object) sub class which can be used to expose certain data manipulation methods to a table value 
 
 -- local tree = object{}
@@ -14,7 +17,10 @@
 -- if true then return end -- blocks the code from running
 ----- ----- ----- ----- ----- -----
 
+-------------------------------------------
+
 -- Local variable declaration for speed improvements
+
 local type,pairs,table,unpack,setmetatable,getmetatable,getfenv,setfenv,object = 
 type,pairs,table,table.unpack,setmetatable,getmetatable,getfenv,setfenv,object
 local abs,pi,cos,min,max,pow,acos,floor,sqrt = math.abs,math.pi,math.cos,
@@ -40,12 +46,11 @@ local _object,object,libs,initial,stack =
  object,{},object.libs,object._initial,
  object._stack
 
------ ----- ----- ----- ----- -----
-
 -- accepted metatable keys to be parsed from object
+
 local meta_tables,meta_ext = { __index = true, __tostring = true,  __newindex = true, __call = true, __add = true, __sub = true, __mul = true, __div = true, __unm = true, __concat = true, __len = true, __eq = true, __lt = true, __le = true}, { __type = true, __version = true, __namespace = true}
 
------------- ------------ ------------ ------------
+----- ----- ----- ----- ----- -----
 -- Configuration methods for object instance behavior in code / within scopes
 
 local _objectConfig = {
@@ -94,9 +99,12 @@ local meta = {__index = self, __type = "object class", __version = Lib_Version,
     __call = function(self,...) -- creates object class from initializer
         return -- self.init and self:init(...) or 
     self:new(...) end } 
+
 setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
 
 ------------ ------------ ------------ 
+
+-- TBD / Temporary 
 
 local __ENV = _ENV
 
@@ -692,47 +700,85 @@ object.keys = function(self) -- gets keys of an object
         keys[pos],index = index,next(self,index) pos = pos + 1 end
 return keys end -- returns: array of table keys
 
+
+-------- -------- -------- -------- 
+-- helper: finds indexOf table elements
+
+local _indexOf = function(self,last,...) 
+    
+  local count,first,args,keymap,matches = select("#",...), select(1,...)
+    
+  if count > 1 then
+    args,keymap,matches = {...},{},{}
+    for i = 1, #args do
+     keymap[args[i]] = false
+    end
+  end
+
+  local start,fin,step = last and #self or 1, last and 1 or #self, last and -1 or 1
+    
+  local found = 0
+  for i = start,fin,step do
+    
+    if count ~= 1 then
+     local arg = self[i]      
+     if keymap[arg] == false then          
+      keymap[arg],found = i,found + 1
+      if found == count then break end    
+     end
+            
+    elseif self[i] == first then
+     return i end
+          
+  end
+    
+  for i = 1, #args do
+    local index = keymap[args[i]]
+    args[i] = index and index or "nil" 
+  end
+    
+  return unpack(args)
+    
+end
+
 -------- -------- -------- -------- 
 -- object.first|...| Prefix 
 -------- -------- -------- -------- 
 
 object.first = function(self,number) -- gets first element(s) of object
-    if not number or number == 1 then return self[1] else local val,out = abs(number),{}
-        for i = 1,val do if self[i] then out[i] = self[i] else break end end 
-    return unpack(out) end end -- returns: vararg of entries
+ if not number or number == 1 then
+  return self[1] 
+ else local val,out = abs(number),{}
+  for i = 1,val do if self[i] then out[i] = self[i] else break end end 
+return unpack(out) end end -- returns: vararg of entries
 
---- first: _object.first ------ ------
+--- last: _object.first ------ ------
 object:_ext():_prefix().first = object.first
--------- -------- -------- -------- 
+------ ------ ------
 
-object.first.IndexOf = function(self,val,...) -- finds first numerical indexies of args
-    if select("#",...) == 0 then for index = 1,#self do -- handles one index query
-            if self[index] == val then return index end end return nil -- returns: first index o
-    else local values,target,val,found = {val,...} local max = #values -- handles multiple index queries
-        for i = 1,max do val = values[i] found = false for index = 1,#self do if self[index] == val then 
-                    values[i] = index found = true break end end if not found then values[i] = nil end end
-    return unpack(values,1,max) end end -- returns: vararg of index numbers or nils
+object.first.IndexOf = function(self,...)
+ return _indexOf(self,false,...)
+end -- returns: vararg - indices or nils
 
 -------- -------- -------- -------- 
 -- object.last|...|  Prefix
 -------- -------- -------- -------- 
 
-object.last = function(self,number) -- gets last element(s) of object
-    if not number or number == 1 then return self[#self] else local val,out,max = abs(number),{},#self
-        for i = max, (max + 1) - val, -1 do if self[i] then out[(max + 1) - i] = self[i] else break end end 
-    return unpack(out) end end -- returns: vararg of entries
+object.last = function(self,count) -- gets last element(s) of object
+  if not count or count == 1 then 
+    return self[#self] 
+  else local val,out,max = abs(count),{},#self
+  for i = max, (max + 1) - val, -1 do if self[i] then out[(max + 1) - i] = self[i] else break end end 
+  return unpack(out) end end -- returns: vararg of entries
 
 --- last: _object.last ------ ------
 object:_ext():_prefix().last = object.last
--------- -------- -------- 
+------ ------ ------
 
-object.last.IndexOf = function(self,val,...) -- finds last numerical indexies of args
-    if select("#",...) == 0 then for index = #self,1,-1 do -- handles one index query
-            if self[index] == val then return index end end return nil -- returns: last indes of val
-    else local values,target,val,found = {val,...} local max = #values -- handles multiple index queries
-        for i = 1,max do val = values[i] found = false for index = #self,1,-1 do if self[index] == val then 
-                    values[i] = index found = true break end end if not found then values[i] = nil end end
-    return unpack(values,1,max) end end -- returns: vararg of index numbers or nils
+object.last.IndexOf = function(self,...)  
+  return _indexOf(self,true,...)    
+end -- returns: vararg - indices or nils
+
 
 -------- -------- -------- -------- 
 -- object.copy|...| -- TODO Prefix
@@ -743,7 +789,7 @@ object.copy = function(self) -- Creates a deep copy of object table and metatabl
     for key,value in pairs(self) do if type(value) ~= "table" then copy[key] = value
         else copy[key] = object.copy(value) end end setmetatable(copy,meta) 
     return copy 
-end -- Returns: object - copy of object
+end -- returns: object - copy of object
 
 -------- -------- -------- -------- 
 
@@ -765,7 +811,7 @@ object.inverseIndexies = function(self) -- Inverses numerical indexies of array
  end
 
 object.concat = function(self,sep) -- Concantinates table indexies
-  local concat = table.concat return concat(self,sep)
+  local concat = concat return concat(self,sep)
  end -- returns: "indexies..sep,... string"
 
 ---------- -------- ----------
@@ -835,7 +881,6 @@ object.isInstanceOf = object.isTypeOf
 object.isOfType = object.isTypeOf
 
 ---------- -------- ----------
-
 -- Binding Methods
 
 -- TBD - Binding to a super which is already part of an object should do nothing. Binding a table to an object should do what? binding an object to an object with the same super should make a multiple inherited object and change the bindee object to this object. The bindees super doesnt directly become the object which it is bound to
