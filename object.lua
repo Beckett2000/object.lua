@@ -777,8 +777,9 @@ local _indexOf = function(self,last,...)
     
   if count > 1 then
     args,keymap,matches = {...},{},{}
-    for i = 1, #args do
-     keymap[args[i]] = false
+    for i = 1, #args do        
+     if args[i] ~= nil then 
+      keymap[args[i]] = false end
     end
   end
 
