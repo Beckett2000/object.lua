@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.06 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-2-25)
+-- object.lua - 3.08 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-5-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -67,6 +67,8 @@ local _objectConfig = {
     
     -- Implicit 'self' - When in the scope of an object (i.e. tree:inScopeOf) pass self as first argument to base methods.
     
+    -- Note: Without this flag enabled, you can use the [ :focus() / :blur() ] methods on an object to pass an implied self to methods
+    
     -- Note: Not tested on Lua 5.1
     
     implicitSelf = false,
@@ -81,6 +83,20 @@ local _objectConfig = {
     ]] ---- ---- ---- ---- ----
     
     ------ -------- ------ --------
+
+    -- WIP - Allows calls to be chained with callbacks through an object
+    
+    -- (Note: 04/05) Extension precidence / order of operations needs to be worked on with the call chaining
+    
+    --[[ ---- ---- ---- ---- ----
+    local tree = object()
+    tree:insert():first("a"):last("b")
+    print(tree) --> tree{"a","b"}
+    ]] ---- ---- ---- ---- ----
+    
+    callChain = false
+    
+    ------ -------- ------ --------
 }
 
 ------------ ------------ ------------
@@ -88,8 +104,10 @@ local _objectConfig = {
 -- Holds implicit self pointer ref. (see _objectConfig.implicitSelf)
 
 local _implicitSelfObj = nil 
-local _isObject 
 
+------------ ------------ ------------ 
+-- Private method declarations
+local _isObject, _firstOrLast, _indexOf
 ------------ ------------ ------------ 
 
 local meta = {__index = self, __type = "object class", __version = Lib_Version,
@@ -104,7 +122,7 @@ setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(obje
 
 ------------ ------------ ------------ 
 
--- TBD / Temporary 
+-- TBD / Temporary - Trying to fix scope for module import vs inline class
 
 local __ENV = _ENV
 
@@ -115,22 +133,6 @@ end
 
 object.getenv = function()
     return __ENV
-end
-
------------- ------------ ------------ 
--- Helper Functions
-
-local function isCallableTable(value)
-    local metatable = getmetatable(value)
-    if metatable and metatable.__call then return true
-    else return false end
-end
-
-local function isFunctionOrCallableTable(value)
-    local valueType = type(value)
-    if valueType == "function" then return true
-    elseif valueType ~= "table" then return false end
-    return isCallableTable(value)
 end
 
 ------------ ------------ ------------ 
@@ -207,8 +209,26 @@ local toStringHandler = function(value)
 end --> returns: serial descriptor string
 
 ------------ ------------
+-- (top level) helpers for building object
 
------------- ------------ ------------ ------------ ------------ ------------ ------------ 
+-------- ------ >>
+
+local isCallableTable = function(value)
+    local metatable = getmetatable(value)
+    if metatable and metatable.__call then return true
+    else return false end
+end
+
+-------- ------ >>
+
+local isFunctionOrCallableTable = function(value)
+    local valueType = type(value)
+    if valueType == "function" then return true
+    elseif valueType ~= "table" then return false end
+    return isCallableTable(value)
+end
+
+------------ ------------ ------------ 
 -- Object Extension Module :init() - (object:ext()) ----------- ----------- ---------
 
 local function getInheritedValue(self,prototype,key) 
@@ -233,6 +253,7 @@ local function getInheritedValue(self,prototype,key)
     
 end
 
+-- builder: builds object._ext
 local function initExtensionLayer(self) -- (private) initializes object extension layer
     local meta = getmetatable(self) if meta == nil then meta = {} setmetatable(self,meta) end
     if not meta.__exIndex then 
@@ -269,17 +290,21 @@ local function getExtensionIndex(self)
     return exIndex 
 end
 
------------- ------------ ------------ ------------ ------------ ------------ ------------ 
+------------ ------------ ------------ 
+
 -- object extension module -> object:extension():method() | object.extension:method()
 
--- The extensions module creates extensions which can perform various functions which normally exceed the standard bounds of lua. This is not one single method, but more a collection of meethods which together extend the object class. Extensions are not private to objects, and any lua table can adopt an extension. Exposed extensions are below ...
+-- _ext():dict() -> was prefix i.e. insert.first but would not combine into insertFirst when called ...
 
--- [ :ext():prefix() / :ext():dictionary() ] These methods both create data structures which pass their selfness to an internal method call as their root object. Dictionary extensions store data internally in their meta.__dataStore and are pulled into an object when edited, while prefix extensions reference the keys in the root object which begn with their key name. Declaration and usage is below...
------------- ------------ ------------ ------------ ------------ ------------ ------------
+-- now _prefix: is object.insertFirst | object.insertfirst | object.insert.First | object.insert.first
+
+------------ ------------ ------------
 
 local function getExtStore(self) -- (private) points to / creates object.ext store
+    
     local target,ext 
     if self ~= object then -- stores extensions in __exIndex of metatable
+        
         local layer,meta = getExtensionIndex(self),getmetatable(self)  
         target,ext = layer, meta.__proto and meta.__proto._ext or nil
         
@@ -288,6 +313,8 @@ local function getExtStore(self) -- (private) points to / creates object.ext sto
         meta = {} target._ext = {} local cache = ext or object._ext 
         for k,v in pairs(getmetatable(cache)) do meta[k] = v end meta.__index,meta.__proto = ext,ext;   
     setmetatable(target._ext,meta) end return target._ext end
+
+------------ ------------ ------------
 
 local function _extSetter(ext,wrapper) -- (private) creates setters ext().setter(val).key
     
@@ -342,11 +369,10 @@ local extMeta = { -- .ext() is a dynamic module
                 ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
                 
                 ext._prefix = _extSetter(extension, function(name,method) -- (passUp) object indexer / sorter
-                    return function(self)  
+                 return function(self)  
                         
-                        local extension,meta = {_isPrefix = true},
-                         { __type = "ext.prefix", __self = obj,
-                            
+                  local extension,meta = {_isPrefix = true},
+                    { __type = "ext.prefix", __self = obj,
                             __tostring = function(pointer) -- (ext) returns prefix descriptor string
                                 local level,list,entry,key,val = self,{} while level do key,val = next(level)
                                     while val do if string.find(key,"^"..name) then entry = string.gsub(key,"^"..name,"") 
@@ -378,6 +404,8 @@ local extMeta = { -- .ext() is a dynamic module
                             
                             end,
                             
+                            ---- ---- ---- ---- ---- ----
+                            
                             __index = function(pointer,key) -- indexing statement: _.|prefix|:|name|()
                                 
                                 local key = name..tostring(key)
@@ -387,15 +415,17 @@ local extMeta = { -- .ext() is a dynamic module
                                 
                                  --[[
                                  if true and path then return function(...) 
-                                  return path( ...) end end
+                                  return path(...) end end
                                  ]] --end
                                         
                                  --- --- -----
+    
                                  if v == pointer then return path(self,...)
+                                            
                                  -- elseif pointer._isPrefix == true then print("ok") return pointer
-                                 elseif self == object then return object[key](v,...) 
+                                            
+                                 elseif self == object then return object[key](v,...)          
                                  end
-                                 --- --- ----
                                         
                                  ---- ------ ---- ------ ---- ------
                                  -- overload: objectInst.[ext].[val] points to objectInst i.e. tree.insert.first("apple") -> tree{"apple"}
@@ -403,26 +433,46 @@ local extMeta = { -- .ext() is a dynamic module
                                  if _objectConfig.dotObjectRef == true then
                                   return path(self,v,...)       
                                  end
-                                        
+
                                  ---- ------ ---- ------ ---- ------
                                     
                                 end 
                             
-                                elseif key ~= "__self" then return path end  
+                                elseif key ~= "__self" then 
+                                 -- print("fell through to __self ...")
+                                 return path end  
+                                
                                 return path
                             
                             end, -- returns: redirector or key actual 
+                            
+                            ---- ---- ---- ---- ---- ----
                             
                             __call = function(pointer,obj,...) -- calling statement: _:|prefix|() / _:|prefix|():|name|()          
                                      
                                 if not obj then return end local extra = select("#",...)
                                 local meta = obj and getmetatable(pointer)
+                                local objType = type(obj)
                                 
-                                if obj == pointer and extra == 0 then return pointer
-                                elseif extra == 0 and type(obj) == "table" then 
-                                  return obj[name] and obj[name] or
-                                   getBackReference(pointer)[name]                    
+                                ------ ------ ------
+                                --- WIP - use this to alow _ext():_prefix() methods to not return the prefix itself when called with no arguments 
+                                
+                                if _objectConfig.callChain == true then
+                                
+                                 if obj == pointer and extra == 0 then 
+                                  return pointer 
+                                    
+                                 elseif extra == 0 and objType == "table" then 
+                                  -- print("Handling _ext store for calling ...")
+                                 return obj[name] and obj[name] or
+                                  getBackReference(pointer)[name]  
+                                        
+                                end
+                                ------ ------ ------
+                                                      
                                 else return method(obj,...) end end 
+                            
+                            ---- ---- ---- ---- ---- ----
                             
                         } setmetatable(extension,meta) return extension end end ) 
                 
@@ -440,7 +490,7 @@ local extMeta = { -- .ext() is a dynamic module
 setmetatable(object._ext,extMeta)
 
 ------------------------------------------------------------------
--- Primative Object Constructor -> object:new() | object()
+-- Primitive Object Constructor -> object:new() | object()
 
 -- The new metamethods for an object subclass are passed at the time of initialization. If metatable elements are detected, they are removed from the objects methods and added to its metatable. The imput object as well as the output object retured can be used to add new methods and values to a class, but new metamethods will not be detected after initial initialization.
 
@@ -469,6 +519,18 @@ object.new = function(super,self) -- (object) - base constructor
     
 return self end -- returns: new object instance
 
+---------- ---------- ----------
+
+-- WIP - object.extend creates a prefix based on a key so that it can function such as object.insertFirst | object.insert.first | object.insert:First etc. 
+
+object.extend = function(self,key)
+ if not self or type(self) ~= "table" then 
+  return end
+ if self[key] and 
+  isFunctionOrCallableTable(self[key]) then 
+   object:_ext():_prefix()[key] = self[key]
+  end end
+
 -------------------- -------------------- --------------------     
 -- (_.insert, _.remove) - Prefix Block Extensions
 ------------------- - -------------------- --------------------     
@@ -485,7 +547,8 @@ return self end -- returns: new object instance
 
 -- object.insert|...| -- These functions are used to add data to the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:insert() block call connections -> object:insert():First(values):Last(values).
 
-object:_ext():_prefix().insert = table.insert
+object.insert = table.insert
+object:extend("insert")
 
 -------------------- --------------------
 
@@ -544,8 +607,9 @@ object.insert.KeysFromTable = function(self,source,overwrite) -- inserts keys fr
 ---- ------ -------- ---------- --------
 
 -- object.remove|...| -- These functions are used to remove data from the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:remove()
-    
-object:_ext():_prefix().remove = table.remove; 
+
+object.remove = table.remove
+object:extend("remove")
 
 ---- ------ -------- ---------- --------
 
@@ -636,7 +700,7 @@ object.remove.Range = function(self,first,last) -- removes entries within range 
     elseif first < last then local out = {} -- starts at first index and loops until last
         for i = 1, last - first + 1 do out[i] = table.remove(self,first) end return unpack(out)
     elseif last < first then local out = {} -- starts at last index and loops until first
-        for i = 1,first - last + 1 do out[i] = table.remove(self,last) end return unpack(out) end end
+        for i = 1, first - last + 1 do out[i] = table.remove(self,last) end return unpack(out) end end
 
 object.remove.Entry = function(self,entry) -- finds entry in table and removes all instances
     if not self then error("Invalid argument no.1 'self' to object.removeEntry().") end
@@ -652,31 +716,43 @@ object.remove.Entries = function(self,...) -- finds values in table and removes 
         object.removeEntry(self,args[i]) end 
 return unpack(args) end
 
+---- ------ ---- ------ -- >>
+
 -- (alias names) - object.insert|...| / object.remove|...| declaration point ...
 
-object.unshift, object.shift, object.push, object.pop, object.slice =
-object.insertFirst, object.removeFirst, object.insertLast, object.removeLast, object.removeAtIndex
+object.unshift = object.insertFirst
+object.shift = object.removeFirst
+object.push = object.insertLast
+object.pop = object.removeLast
+object.slice = object.removeAtIndex
 
 ------------------------------------------------------------------
--- (public) Object Native Logistics / Querying Methods
+-- Querying / Logging Methods
 ------------------------------------------------------------------
 
 -- An object is created with pointers to methods which can evaluate and modify data which is contained within an object. While these functions do exist in deeper object classes, they can be overriden by methods inherited from those classes.
 
+------- ------- ------- -------
+
 object.countElements = function(self) -- gets number of elements in object
-    local i,index = 0,next(self) while index do i = i + 1 index = next(self,index) end return i end
-object.length, object.size = object.countElements, object.countElements
+  local i,index = 0,next(self) while index do i = i + 1 index = next(self,index) end return i end
+
+object.length = object.countElements
+object.size = object.countElements
 
 object.contains = function(self,val,...) -- determines if table contains entry
-    local num = select("#",...) if val and num == 0 then -- used if only one argument is passed
-        local pairs = pairs for _,v in pairs(self) do if v == val then return true end end return false     
+  local num = select("#",...) if val and num == 0 then -- used if only one argument is passed
+        
+  local pairs = pairs for _,v in pairs(self) do if v == val then return true end end return false     
     else local vals = {val,...} -- used if more than one argument is passed
-        local next,remove,total = next,table.remove,#vals local index,value = next(self)             
-        while index do for i = 1, total do if vals[i] == value then remove(vals,i) 
-                    if total - 1 == 0 then return true else total = total - 1 break end end end      
-        index,value = next(self,index) end end return false end -- returns: true or false
+     local next,remove,total = next,table.remove,#vals local index,value = next(self)             
+      while index do for i = 1, total do if vals[i] == value then remove(vals,i) 
+       if total - 1 == 0 then return true else total = total - 1 break end end end      
+     index,value = next(self,index) end end return false end -- returns: true or false
 
---object.hasKeys = function(self,val,...)
+-------- -------- -------- -------- 
+
+-- (Note 4-05) These methods need to be refactored
 
 object.indexiesOf = function(self,val,...) -- finds all numerical indexies of arguments
     local out = {} if select("#",...) == 0 then for index = 1,#self do -- handles one index query
@@ -695,90 +771,77 @@ object.keysOf = function(self,val,...) -- finds all numerical indexies and keys 
             while key do if value == val then table.insert(target,key) end key,value = next(self,key) end end
     return unpack(out) end end -- returns: vararg of key arrays
 
+-------- -------- -------- -------- 
+-- object.keys 
+-------- -------- -------- -------- 
+
 object.keys = function(self) -- gets keys of an object 
-    local keys = {} local pos,index = 1,next(self) while index do 
-        keys[pos],index = index,next(self,index) pos = pos + 1 end
+  local keys = {} local pos,index = 1,next(self) while index do 
+  keys[pos],index = index,next(self,index) pos = pos + 1 end
 return keys end -- returns: array of table keys
 
+-- object:extend("keys")
+
+object.hasKeys = function(self,...)
+ if not self or type(self) ~= "table" then return false end
+ for i = 1, select("#",...) do
+  if not self[select(i,...)] then return false end
+  end return true end
 
 -------- -------- -------- -------- 
--- helper: finds indexOf table elements
-
-local _indexOf = function(self,last,...) 
-    
-  local count,first,args,keymap,matches = select("#",...), select(1,...)
-    
-  if count > 1 then
-    args,keymap,matches = {...},{},{}
-    for i = 1, #args do
-     keymap[args[i]] = false
-    end
-  end
-
-  local start,fin,step = last and #self or 1, last and 1 or #self, last and -1 or 1
-    
-  local found = 0
-  for i = start,fin,step do
-    
-    if count ~= 1 then
-     local arg = self[i]      
-     if keymap[arg] == false then          
-      keymap[arg],found = i,found + 1
-      if found == count then break end    
-     end
-            
-    elseif self[i] == first then
-     return i end
-          
-  end
-    
-  for i = 1, #args do
-    local index = keymap[args[i]]
-    args[i] = index and index or "nil" 
-  end
-    
-  return unpack(args)
-    
-end
-
--------- -------- -------- -------- 
--- object.first|...| Prefix 
+-- object.first|...| -- Prefix 
 -------- -------- -------- -------- 
 
-object.first = function(self,number) -- gets first element(s) of object
- if not number or number == 1 then
-  return self[1] 
- else local val,out = abs(number),{}
-  for i = 1,val do if self[i] then out[i] = self[i] else break end end 
-return unpack(out) end end -- returns: vararg of entries
+object.first = function(self,count) 
+  return _firstOrLast(self,1,count) 
+end -- returns: first entrie(s)
 
---- last: _object.first ------ ------
-object:_ext():_prefix().first = object.first
------- ------ ------
-
+object:extend("first")
+  
 object.first.IndexOf = function(self,...)
- return _indexOf(self,false,...)
-end -- returns: vararg - indices or nils
+  return _indexOf(self,false,...)
+ end -- returns: vararg - indices or nils
 
 -------- -------- -------- -------- 
--- object.last|...|  Prefix
+-- object.last|...| -- Prefix
 -------- -------- -------- -------- 
 
-object.last = function(self,count) -- gets last element(s) of object
-  if not count or count == 1 then 
-    return self[#self] 
-  else local val,out,max = abs(count),{},#self
-  for i = max, (max + 1) - val, -1 do if self[i] then out[(max + 1) - i] = self[i] else break end end 
-  return unpack(out) end end -- returns: vararg of entries
+object.last = function(self,count) 
+    return _firstOrLast(self,-1,count) 
+end -- returns: last entrie(s)
 
---- last: _object.last ------ ------
-object:_ext():_prefix().last = object.last
------- ------ ------
+object:extend("last")
 
 object.last.IndexOf = function(self,...)  
   return _indexOf(self,true,...)    
 end -- returns: vararg - indices or nils
 
+-------- -------- -------- -------- 
+
+-- get index value range / substring of table / string values respectively
+object.range = function(self,start,fin)
+    
+  local out,step = {}, 1
+    
+  if not start or not fin or type(start) ~= "number" or type(fin) ~= "number" then
+   error("Invalid anchor points to object.range.") return
+  end
+
+  if type(self) == "string" then 
+    return string.sub(self,start,fin)
+  end
+
+  start,fin = abs(start),abs(fin)
+  if start == fin then return self[start]
+  elseif start > fin then step = -1 end
+    
+  for i = start,fin,step do 
+   table.insert(out,self[i])
+  end
+    
+  return unpack(out)
+    
+end
 
 -------- -------- -------- -------- 
 -- object.copy|...| -- TODO Prefix
@@ -808,7 +871,9 @@ object.copy:Keys() object.copy:Hash() object.copy:Indexies() object.copy:Meta()
 object.inverseIndexies = function(self) -- Inverses numerical indexies of array
   local pos = 0 for i = #self,1,-1 do i = i + pos self:insert(pos + 1, self:remove(i)) 
   pos = pos + 1 end  return self
- end
+end
+
+object.inverse = object.inverseIndexies
 
 object.concat = function(self,sep) -- Concantinates table indexies
   local concat = concat return concat(self,sep)
@@ -823,6 +888,8 @@ object.type = function(self)
     local meta = getmetatable(self) if meta and meta.__type then return meta.__type 
     else return type(self) end 
 end -- returns: type string of object
+
+---------- -------- ----------
 
 -- Tests if an object is subclass / instance of another object or a data value is a certain type
 
@@ -879,6 +946,39 @@ end
 
 object.isInstanceOf = object.isTypeOf
 object.isOfType = object.isTypeOf
+
+---------- -------- ----------
+
+object.meta = function(self) -- Creates object reference to metatable
+  local meta = getmetatable return meta(self)
+ end -- returns: object metatable
+
+object.super = function(self) -- Returns super class / prototype of object
+  return getmetatable(self).__proto end 
+object.prototype = object.super -- alias for object.super
+
+---------- -------- ----------
+
+object.toString = function(...) -- Pretty print table / object
+    
+    local count = select("#",...)
+    local strings = {}
+    
+    ---- ------ ------
+    
+    for i = 1, count do
+     local string = toStringHandler(select(i,...))
+     if count == 1 then return string end
+      table.insert(strings,string)
+    end
+    
+    ---- ------ ------
+    
+    if count ~= 1 then return 
+     table.unpack(strings) 
+    end
+    
+end
 
 ---------- -------- ----------
 -- Binding Methods
@@ -942,38 +1042,7 @@ end
 
 ---------- -------- ----------
 
-object.meta = function(self) -- Creates object reference to metatable
-  local meta = getmetatable return meta(self)
- end -- returns: object metatable
-
-object.super = function(self) -- Returns super class / prototype of object
-  return getmetatable(self).__proto end 
-object.prototype = object.super -- alias for object.super
-
----------- -------- ----------
-
-object.toString = function(...) -- Pretty print table / object
-    
-    local count = select("#",...)
-    local strings = {}
-    
-    ---- ------ ------
-    
-    for i = 1, count do
-     local string = toStringHandler(select(i,...))
-     if count == 1 then return string end
-      table.insert(strings,string)
-    end
-    
-    ---- ------ ------
-    
-    if count ~= 1 then return 
-     table.unpack(strings) 
-    end
-    
-end
-
--- Note / TBD: This could only work outside of an object scope
+-- Note / TBD: This could only work outside of an object scope -- WIP
 
 -- object.tostring = object.toString
 
@@ -1006,7 +1075,7 @@ local function _formatScopeVar(self,key,var)
     if format == "number" or format == "string" or (format == "table" and var._isPrefix == true) then return var     
     end
     
-    if (_objectConfig.implicitSelf == true or _implicitSelfObj ~= nil) and format == "function" and (type(self) == "table" and self[key] ~= nil and self.isObject() == true) then
+    if (_objectConfig.implicitSelf == true or _implicitSelfObj ~= nil) and format == "function" and (type(self) == "table" and self[key] ~= nil and _isObject(self)) then
         
         ------- ------- ------- -------
         -- Adds a wrapped callback for _ext nethods passing implicit self
@@ -1049,9 +1118,11 @@ end
 
 -------------------------------------------
 
--- The :focus() and :blur() methods are used to enable/disabe the object which it is called on as the self (first argument) to methods within an objects class. i.e. If an object is in scope -> obj:inScopeOf() - push() would implicitly be called as push(self) / push(obj) 
+-- object [:focus() / :blur()]
 
---  Note: _objectConfig.implicitSelf set to true overrides these methods.
+-- Note: _objectConfig.implicitSelf set to true overrides these methods.
+
+-- The :focus() and :blur() methods are used to enable/disabe the object which it is called on as the self (first argument) to methods within an objects class. i.e. If an object is in scope -> obj:inScopeOf() - push() would implicitly be called as push(self) / push(obj) 
 
 -------------------------------------------
 
@@ -1110,7 +1181,7 @@ local _getGlobalScope = function()
     
     if _VERSION ~= "Lua 5.1" then
       local scope = initial.global
-      print("This is the scope:",scope)
+      -- print("This is the scope:",scope)
       if not scope then scope = _ENV end
       return scope
     else return _G end
@@ -1177,6 +1248,7 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
    -- TODO - upvalue stack from scope?
     
    object.inScopeOf = function(self)
+        
     local env,step = _getGlobalScope(), 0
     local scopeWrapper;
         
@@ -1206,12 +1278,11 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
             
      if foundEnv then 
                 
-       -----------
+       -----------     
        -- This is the point where you change the upvalue - disable for debugging broken loops     
       debug.setupvalue(scopeWrapper,foundIndex,environment);
                 
-       -- _ENV = environment
-                
+       -- _ENV = environment        
        ------------
 
       meta.__inScope = true end
@@ -1288,7 +1359,72 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
 end
 
 ----- ----------- ----------- -----------
--- private methods below this point
+-- private methods below this point -- >>
+----- ----------- ----------- -----------
+
+-------- ------ >>
+-- helper: gets list of element(s) in object
+
+_firstOrLast = function(self,dir,cnt) 
+    
+    local fromStart,count = dir == 1,cnt
+    if not count or count == 1 then
+        return fromStart and self[1] or self[#self] 
+        
+    else local val,out = abs(count),{}
+        if fromStart then -- first entries
+            for i = 1,count,1 do
+                table.insert(out,self[i]) end        
+        else -- last entries
+            for i = #self - count + 1,#self,1 do  
+                table.insert(out,self[i]) end
+            
+        end return unpack(out)
+    end end -- returns: vararg of entries    
+
+-------- ------ >>
+-- helper: finds indexOf table elements  
+  
+_indexOf = function(self,last,...) 
+    
+  local count,first,args,keymap,matches = select("#",...), select(1,...)
+    
+  if count > 1 then
+    args,keymap,matches = {...},{},{}
+    for i = 1, #args do        
+     if args[i] ~= nil then 
+      keymap[args[i]] = false end
+    end
+  end
+
+  local start,fin,step = last and #self or 1, last and 1 or #self, last and -1 or 1
+    
+  local found = 0
+  for i = start,fin,step do
+    
+    if count ~= 1 then
+     local arg = self[i]      
+     if keymap[arg] == false then          
+      keymap[arg],found = i,found + 1
+      if found == count then break end    
+     end
+            
+    elseif self[i] == first then
+     return i end
+          
+  end
+    
+  for i = 1, #args do
+    local index = keymap[args[i]]
+    args[i] = index and index or "nil" 
+  end
+    
+  return unpack(args)
+    
+end
+
+-------- ------ >>
+-- used to find objects in metadata
 
 _isObject = function(self)
     
@@ -1311,8 +1447,7 @@ _isObject = function(self)
     
 end
 
------ ----------- ----------- ----------- ----------- ----------- -----------
------------ ----------- -----------  ----------- ----------- ----------- -----------
+----- ----------- ----------- ----------- ----------- ----------- 
 
 -- (object env) - The 'object' global variable space is used to represent the object environment and its methods. The object base class is referenced by the environment's meta.__index.
 
@@ -1323,24 +1458,6 @@ local meta = getmetatable(object) -- Allows object class to have independent ext
   __tostring = toStringHandler })
 
 object = _object; initExtensionLayer(object) -- updates object alias pointer
-
----------- ---------- ----------
-
--- Private Class Methods entered after this point ...
-
------------ ----------- ------ ----- ----------- ----------- ----------- -----------
-
---[[
-
-function iter(self)
-    local env,step = _ENV or _G, 0
-    return function() step =step + 1
-        if step == 1 then local a = getScope(self) _ENV = a return a
-        else _ENV = env return end
-    end
-end
-
-]]
 
 ----- ----------- ----------- -----------
 
