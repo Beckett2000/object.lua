@@ -22,3 +22,22 @@ testObject = function()
     print(tree.last:indexOf(490,nil,20,"nil",100,5,80))
     
 end 
+
+testObject = function()
+    
+    local test = object{"a","b","c","d","b","e","a","f"}
+    
+    print(test)
+    
+    print(test:first())
+    print(test.first:indexOf("b","c","a"))
+    print(test:lastIndexOf("b","c","a"))
+    
+    test.insert:atIndex(4,"abc")
+    print(test)
+    
+    test.remove:indexiesOf("a")
+    print(test)
+    
+end
+
