@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.08 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-5-25)
+-- object.lua - 3.08 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-9-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -12,11 +12,7 @@
 -- print(tree) -- -> {"foo","bar"}
 
 -------------------------------------------
-
------ ----- ----- ----- ----- -----
--- if true then return end -- blocks the code from running
------ ----- ----- ----- ----- -----
-
+-- if true then return end -- --- ---- -- 
 -------------------------------------------
 
 -- Local variable declaration for speed improvements
@@ -181,7 +177,7 @@ local toStringHandler = function(value)
     
      if isObject then
         
-      local meta = self:meta()
+      local meta = getmetatable(self)
       setmetatable(self,nil) -- bind
     
        local rawString = tostring(self)
@@ -226,6 +222,16 @@ local isFunctionOrCallableTable = function(value)
     if valueType == "function" then return true
     elseif valueType ~= "table" then return false end
     return isCallableTable(value)
+end
+
+-------- ------ >>
+
+local _stringifyTable = function(tab)
+  local stringTable = {}
+  for i = 1,#tab do
+  table.insert(stringTable,
+   tostring(tab[i])) end
+  return table.concat(stringTable)
 end
 
 ------------ ------------ ------------ 
@@ -550,54 +556,144 @@ object.extend = function(self,key)
 object.insert = table.insert
 object:extend("insert")
 
--------------------- --------------------
+------ ---- ------ ---- ------
 
-object.insert.First = function(self,value,...) -- adds values to beginning of table
-    local capacity = 0 if value then -- adds first value to table
-    capacity = capacity + 1 table.insert(self,capacity,value) end 
-    local extra = select("#",...) if extra > 0 then local args,arg = {...}
-        for i = 1, extra do arg = args[i] -- adds extra arguments with table
-            if arg then capacity = capacity + 1 table.insert(self,capacity,arg) end end end
-return self end -- returns: subject table of call
+-- adds values to start of table/string
+object.insert.first = function(self,...)
+    
+  local count,args = select("#",...)
+    
+  if not self then 
+   error("Argument 1 (self) to object.insert.first was nil.") return 
+  elseif count == 0 then return self end
+  local format = type(self) 
+    
+  -- string handling
+    
+  if format == "string" then
+   if count == 1 then
+    return select(1,...)..self end
+   return _stringifyTable{...,self}
+  end -- returns: (new string)
+    
+  -- table handling
+    
+  if format ~= "table" then error(_stringifyTable{"Invalid argument 1 (self: ",self,") of type (",format,") to object.insert.first."}) return end
 
-object.insert.Last = function(self,value,...) -- adds values to end of table
-    local capacity = #self if value then -- adds first value to table
-        capacity = capacity + 1 self[capacity] = value end 
-    local extra = select("#",...) if extra > 0 then local args,arg = {...}
-        for i = 1, extra do arg = args[i] -- adds extra arguments with table
-            if arg then capacity = capacity + 1 self[capacity] = arg end end end
-return self end -- returns: subject table of call
+  if count == 1 then
+   table.insert(self,1,select(1,...))
+   return self
+  else args = {...} end 
+    
+  for i = count,1,-1 do 
+   table.insert(self,1,args[i])
+  end return self
+    
+end -- returns: table (self)
 
-object.insert.AtIndex = function(self,index,val,...) -- adds values at index in table  
-    if index < 1 then index = 1 else local max = #self if index > max then index = max + 1 end end
-    if val then table.insert(self,index,val) index = index + 1 end -- adds first value to table
-    local extra = select("#",...) if extra > 0 then local args,arg = {...}
-        for i = 1, extra do arg = args[i] -- adds extra arguments with table  
-            if arg then table.insert(self,index,arg) index = index + 1 end end end
-return self end -- returns: subject table of call
+-- object.unshift = object.insert.first
+
+---- ---- ------
+
+-- adds values to the end of table/string
+object.insert.last = function(self,...)
+    
+  local count,args = select("#",...)
+    
+  if not self then
+   error("Agument 1 (self) to object.insert.last was nil.") return
+  elseif count == 0 then return self end
+  local format = type(self)   
+    
+  -- string handling
+
+  if format == "string" then
+   if count == 1 then
+    return self..select(1,...) end
+   return _stringifyTable{self,...}
+  end -- returns: (new string)
+    
+  -- table handling
+    
+  if format ~= "table" then error(_stringifyTable{"Invalid argument 1 (self: ",self,") of type (",format,") to object.insert.last."}) return end
+  
+  if count == 0 then return self
+  elseif count == 1 then
+   table.insert(self,select(1,...))
+   return self
+  else args = {...} end
+    
+  for i = 1,count do 
+   table.insert(self,args[i])
+  end return self 
+    
+end -- returns: table (self)
+
+-- object.push = object.insert.last
+
+---- ---- ------
+
+-- adds values to the index of a table
+object.insert.atIndex = function(self,index,...)
+    
+  if not self then
+   error("Agument 1 (self) to object.insert.atIndex was nil.") return
+  elseif count == 0 then return self end
+  local format = type(self)   
+    
+  local max,abs = #self + 1, abs
+  index = index < 1 and 1 or index > max and max or abs(index)
+    
+  -- string handling
+    
+  if format == "string" then
+   local first,second = string.sub(self,1,index),
+    string.sub(self,index + 1,#self)    
+   
+   local strData = {first,...}
+   table.insert(strData,second)
+   return _stringifyTable(strData)
+  end -- returns: (new string)
+    
+  -- table handling
+    
+  if format ~= "table" then error(_stringifyTable{"Invalid argument 1 (self: ",self,") of type (",format,") to object.insert.atIndex."}) return end
+    
+  local argCount = select("#",...)
+  if argCount == 1 then
+   table.insert(self,index,select(1,...))    
+  else local args,arg = {...} 
+   for i = 1,argCount do arg = args[i]
+    if arg then 
+     table.insert(self,index,arg)
+     index = index + 1 end end
+        
+ end end -- returns: table (self)
+
+------ ---- ------ ---- ------
 
 -- Values can be inserted from an existing table rather than having to be ennumerated manually in the insert declaration. Other simpler method namespaces ( will also be ) utilized.
 
-object.insert.FirstIndexiesFromTable = function(self,source) -- inserts indexies first into self
+object.insert.firstIndexiesFromTable = function(self,source) -- inserts indexies first into self
     if not source then return self else for i = 1,#source do -- coppies indexies from source into self
             table.insert(self,i,source[i]) end return self end end
 
-object.insert.LastIndexiesFromTable = function(self,source) -- inserts indexies last into self
+object.insert.lastIndexiesFromTable = function(self,source) -- inserts indexies last into self
     if not source then return self else local total = #self -- coppies indexies from source into self
         for i = 1,#source do table.insert(self,i + total,source[i]) end return self end end
 
-object.insert.AtIndexIndexiesFromTable = function(self,index,source) 
+object.insert.atIndexIndexiesFromTable = function(self,index,source) 
     if not index or not source then return end local total = #self + 1
     local index = index <= 1 and 1 or index >= total and total or index
     for i = 1,#source do table.insert(self,index + i - 1, source[i]) end return self end 
 
-object.insert.IndexiesFromTable = function(self,source,overwrite) -- inserts indexies from table
+object.insert.indexiesFromTable = function(self,source,overwrite) -- inserts indexies from table
     if not source then return self end if overwrite ~= false and overwrite ~= 0 then 
         for i = 1,#source do self[i] = source[i] end -- coppies indexies from source into self
     else for i = 1,#source do -- coppies entries if not present in self
             if not rawget(self,i) then self[i] = source[i] end end return self end end
 
-object.insert.KeysFromTable = function(self,source,overwrite) -- inserts keys from existing table
+object.insert.keysFromTable = function(self,source,overwrite) -- inserts keys from existing table
     if not source then return self end local index,value = next(source)
     if overwrite ~= false and overwrite ~= 0 then while index do -- overwrite: defaults to true
             self[index] = value index,value = next(source,index) end -- overwrites duplicate keys in self       
@@ -611,12 +707,10 @@ object.insert.KeysFromTable = function(self,source,overwrite) -- inserts keys fr
 object.remove = table.remove
 object:extend("remove")
 
----- ------ -------- ---------- --------
-
-object.remove.Index = function(self,index) -- bridged for table.remove method
+object.remove.index = function(self,index) -- bridged for table.remove method
 return table.remove(self,index) end -- returns: table.remove output
 
-object.remove.Indexies = function(self,...) -- removes vararg of indexies from table
+object.remove.indexies = function(self,...) -- removes vararg of indexies from table
     local out,length = {},select("#",...) if length == 0 then return end
     local args = {...} table.sort(args, function(a,b) return a > b and true or false end)        
     local pos,last,index = 0 for i = length,1,-1 do index = args[i]
@@ -624,19 +718,19 @@ object.remove.Indexies = function(self,...) -- removes vararg of indexies from t
         last = index end end table.sort(out, function(a,b) return a < b and true or false end) 
 return unpack(out) end -- returns: vararg of removed values
 
-object.remove.First = function(self,number) -- removes number of entries from beginning of table
+object.remove.first = function(self,number) -- removes number of entries from beginning of table
     if not number or number == 1 or number == -1 then return table.remove(self,1) 
     elseif number == 0 then return false end local out = {} number = abs(number) 
     for i = 1,number do out[i] = table.remove(self,1) end
 return unpack(out) end -- returns: vararg of removed values
 
-object.remove.Last = function(self,number) -- removes number of entries from end of table
+object.remove.last = function(self,number) -- removes number of entries from end of table
     if not number or number == 1 or number == -1 then return table.remove(self,#self) 
     elseif number == 0 then return false end local reps,out = #self + 1,{} number = abs(number) 
     for i = 1,number do out[i] = table.remove(self,reps - i) end
 return unpack(out) end -- returns: vararg of removed values
 
-object.remove.AtIndex = function(self,index,number) -- removes number of entries at index 
+object.remove.atIndex = function(self,index,number) -- removes number of entries at index 
     local max = #self; index = index < 1 and 1 or index > max and max or index
     if not number or number == 1 or number == -1 then return table.remove(self,index)
     else local out,arg = {},number/abs(number) -- removes entries to left or right
@@ -646,19 +740,19 @@ object.remove.AtIndex = function(self,index,number) -- removes number of entries
                 else table.insert(out,table.remove(self,index - arg)) arg = arg + 1 end end end
     return unpack(out) end end -- returns: vararg of removed values
 
-object.remove.BeforeIndex = function(self,index,number) -- removes entries starting before index
+object.remove.beforeIndex = function(self,index,number) -- removes entries starting before index
     if index <= 1 then return false else max = #self; index = index > max and max or index end
     number = number and abs(number) or math.huge local out = {} for i = 1,number do 
         index = index - 1 if self[index] then out[i] = table.remove(self,index) else break end end
 return unpack(out) end -- returns: vararg of removed values   
 
-object.remove.AfterIndex = function(self,index,number) -- removes entries starting after index
+object.remove.afterIndex = function(self,index,number) -- removes entries starting after index
     local max = #self; index = index <= 1 and 2 or index > max and max + 1 or index + 1 
     number = number and abs(number) or math.huge local out = {} for i = 1,number do 
         if self[index] then out[i] = table.remove(self,index) else break end end
 return unpack(out) end -- returns: vararg of removed values
 
-object.remove.FirstIndexOf = function(self,val,...) -- removes values from their first table indexies
+object.remove.firstIndexOf = function(self,val,...) -- removes values from their first table indexies
     local max,extra,removed = #self,select("#",...),0 if val then for i = 1,max do
             if self[i] == val then val = table.remove(self,i) max = max - 1 removed = 1 break 
             elseif i == max then val = false end end end
@@ -668,7 +762,7 @@ object.remove.FirstIndexOf = function(self,val,...) -- removes values from their
                     out[removed] = table.remove(self,i) max = max - 1 break end end end
     return unpack(out) end end
 
-object.remove.IndexiesOf = function(self,...)
+object.remove.indexiesOf = function(self,...)
     
     local args = {...}
     for i = 1,#args do 
@@ -683,7 +777,7 @@ object.remove.IndexiesOf = function(self,...)
     
 end
 
-object.remove.LastIndexOf = function(self,val,...) -- removes values from their last indexies in table
+object.remove.lastIndexOf = function(self,val,...) -- removes values from their last indexies in table
     local max,extra,removed = #self,select("#",...),0 if val then for i = max,1,-1 do
             if self[i] == val then val = table.remove(self,i) max = max - 1 removed = 1 break 
             elseif i == 1 then val = false end end end
@@ -693,7 +787,7 @@ object.remove.LastIndexOf = function(self,val,...) -- removes values from their 
                     out[removed] = table.remove(self,i) max = max - 1 break end end end
     return unpack(out) end end
 
-object.remove.Range = function(self,first,last) -- removes entries within range of indexies
+object.remove.range = function(self,first,last) -- removes entries within range of indexies
     local max = #self; first = first < 1 and 1 or first > max and max or first
     last = last < 1 and 1 or last > max and max or last   
     if first == last then return self[first] and table.remove(self,first) or false -- removes single entry
@@ -702,7 +796,7 @@ object.remove.Range = function(self,first,last) -- removes entries within range 
     elseif last < first then local out = {} -- starts at last index and loops until first
         for i = 1, first - last + 1 do out[i] = table.remove(self,last) end return unpack(out) end end
 
-object.remove.Entry = function(self,entry) -- finds entry in table and removes all instances
+object.remove.entry = function(self,entry) -- finds entry in table and removes all instances
     if not self then error("Invalid argument no.1 'self' to object.removeEntry().") end
     --print(self)
     object.removeIndexiesOf(self,entry)
@@ -710,7 +804,7 @@ object.remove.Entry = function(self,entry) -- finds entry in table and removes a
     for i = 1,#keys do self[keys[i]] = nil end
 return entry end
 
-object.remove.Entries = function(self,...) -- finds values in table and removes them
+object.remove.entries = function(self,...) -- finds values in table and removes them
     if not self then error("Invalid argument no.1 'self' to object.removeEntries().") end
     local args,pos = {...} for i = 1,#args do 
         object.removeEntry(self,args[i]) end 
@@ -812,7 +906,7 @@ end -- returns: last entrie(s)
 
 object:extend("last")
 
-object.last.IndexOf = function(self,...)  
+object.last.indexOf = function(self,...)  
   return _indexOf(self,true,...)    
 end -- returns: vararg - indices or nils
 
@@ -1431,7 +1525,10 @@ _isObject = function(self)
     if type(self) ~= "table" then return false end
     local meta = getmetatable(self)
     if not meta then return false end
-    if meta.__type ~= "object" then return true end
+    
+    -- legacy - maybe remove this later?
+    if meta.__type ~= "object" then 
+     return true end
     
     local proto
     if meta.__index then
@@ -1447,7 +1544,7 @@ _isObject = function(self)
     
 end
 
------ ----------- ----------- ----------- ----------- ----------- 
+----- ----------- ----------- -----------
 
 -- (object env) - The 'object' global variable space is used to represent the object environment and its methods. The object base class is referenced by the environment's meta.__index.
 
