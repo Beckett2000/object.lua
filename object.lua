@@ -558,13 +558,13 @@ object:extend("insert")
 
 ------ ---- ------ ---- ------
 
--- adds values to start of table/string
+-- inserts at the start of a table/string
 object.insert.first = function(self,...)
     
   local count,args = select("#",...)
     
   if not self then 
-   error("Argument 1 (self) to object.insert.first was nil.") return 
+   error("argument 1 (self) to object.insert.first was nil.") return 
   elseif count == 0 then return self end
   local format = type(self) 
     
@@ -578,7 +578,7 @@ object.insert.first = function(self,...)
     
   -- table handling
     
-  if format ~= "table" then error(_stringifyTable{"Invalid argument 1 (self: ",self,") of type (",format,") to object.insert.first."}) return end
+  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.insert.first. Expected type (table|string) got: (",format,")."}) return end
 
   if count == 1 then
    table.insert(self,1,select(1,...))
@@ -595,13 +595,13 @@ end -- returns: table (self)
 
 ---- ---- ------
 
--- adds values to the end of table/string
+-- inserts at the end of a table/string
 object.insert.last = function(self,...)
     
   local count,args = select("#",...)
     
   if not self then
-   error("Agument 1 (self) to object.insert.last was nil.") return
+   error("argument 1 (self) to object.insert.last was nil.") return
   elseif count == 0 then return self end
   local format = type(self)   
     
@@ -615,7 +615,7 @@ object.insert.last = function(self,...)
     
   -- table handling
     
-  if format ~= "table" then error(_stringifyTable{"Invalid argument 1 (self: ",self,") of type (",format,") to object.insert.last."}) return end
+  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.insert.last. Expected type (table|string) got: (",format,")."}) return end
   
   if count == 0 then return self
   elseif count == 1 then
@@ -633,11 +633,11 @@ end -- returns: table (self)
 
 ---- ---- ------
 
--- adds values to the index of a table
+-- inserts at an index of a table/string
 object.insert.atIndex = function(self,index,...)
     
   if not self then
-   error("Agument 1 (self) to object.insert.atIndex was nil.") return
+   error("argument 1 (self) to object.insert.atIndex was nil.") return
   elseif count == 0 then return self end
   local format = type(self)   
     
@@ -657,7 +657,7 @@ object.insert.atIndex = function(self,index,...)
     
   -- table handling
     
-  if format ~= "table" then error(_stringifyTable{"Invalid argument 1 (self: ",self,") of type (",format,") to object.insert.atIndex."}) return end
+  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.insert.atIndex. Expected type (table|string) got: (",format,")."}) return end
     
   local argCount = select("#",...)
   if argCount == 1 then
@@ -707,16 +707,103 @@ object.insert.keysFromTable = function(self,source,overwrite) -- inserts keys fr
 object.remove = table.remove
 object:extend("remove")
 
-object.remove.index = function(self,index) -- bridged for table.remove method
-return table.remove(self,index) end -- returns: table.remove output
+------ ---- ------ ---- ------
 
-object.remove.indexies = function(self,...) -- removes vararg of indexies from table
-    local out,length = {},select("#",...) if length == 0 then return end
-    local args = {...} table.sort(args, function(a,b) return a > b and true or false end)        
-    local pos,last,index = 0 for i = length,1,-1 do index = args[i]
-        if index ~= last and self[index] then pos = pos + 1 out[pos] = table.remove(self,index)
-        last = index end end table.sort(out, function(a,b) return a < b and true or false end) 
-return unpack(out) end -- returns: vararg of removed values
+-- removes one or more indexies from table
+object.remove.indexies = function(self,...) 
+    
+  if not self then
+   error("argument 1 (self) to object.remove.indexies was nil.") 
+   return end
+    
+  local format = type(self)   
+    
+  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.remove.indexies. Expected type (table) got: (",format,")."}) return end
+    
+  local len = select("#",...)
+  if len == 1 then 
+   return table.remove(self,select(1,...)) 
+  end  -- returns: (removed val)
+    
+  local out = {}
+    
+  -- removes all numerical indexies when called without arguments 
+    
+  if len == 0 then for i = 1,#self do
+    table.insert(out,table.remove(self,1)) 
+   end return unpack(out) end -- returns: vararg (removed values)
+  
+  -- removes multiple inexies when more than one index value is passed in
+    
+  local args,indexies = {...},{}
+  local index,ref,count = args[1],1,1
+    
+  while count <= len do
+        
+    if type(index) == "number" and not indexies[index] then 
+      indexies[index] = true  
+      ref = ref + 1
+    else table.remove(args,ref) end  
+         
+    index,count = args[ref], count + 1
+    
+  end
+    
+  indexies = {}
+  table.sort(args, function(a,b) return a > b and true or false end)
+    
+  for i = 1,#args do hash = args[i]
+   indexies[hash] = table.remove(self,hash) 
+  end 
+    
+  for i = 1,len do
+   hash = select(i,...)
+   if hash ~= nil then
+    out[i] = indexies[hash] 
+  end end
+    
+ return unpack(out,1,len) end -- returns vararg (removed values)
+
+---- ---- ------
+
+-- removes one or more keys from table
+object.remove.keys = function(self,...)
+    
+  if not self then
+   error("argument 1 (self) to object.remove.keys was nil.") 
+   return end
+    
+  local format = type(self)   
+    
+  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.remove.keys. Expected type (table) got: (",format,")."}) return end
+    
+  local len,hash,out = select("#",...)
+  if len == 1 then hash = select(1,...)
+   if hash ~= nil then out = self[hash]
+   self[hash] = nil return out end end -- returns: output (removed values)
+  
+  local out = {}
+    
+  -- removes all non numerical keys when called without arguments - maybe this could return a keyed table?
+        
+  if len == 0 then
+   for k,_ in pairs(self) do
+    if type(k) ~= "number" then 
+     table.insert(out,self[k]) 
+     self[k] = nil end 
+   end return unpack(out)
+        
+  -- removes multiple key values when more than one key is passed in
+        
+  else local args = {...}
+   for i = 1,#args do hash = args[i]
+    if hash ~= nil then
+     out[i],self[hash] = self[hash], nil         
+  end end end 
+    
+ return unpack(out,1,len) end -- output (removed values)
+    
+---- ---- ------
 
 object.remove.first = function(self,number) -- removes number of entries from beginning of table
     if not number or number == 1 or number == -1 then return table.remove(self,1) 
@@ -1051,6 +1138,8 @@ object.super = function(self) -- Returns super class / prototype of object
   return getmetatable(self).__proto end 
 object.prototype = object.super -- alias for object.super
 
+object.proto = object.super
+
 ---------- -------- ----------
 
 object.toString = function(...) -- Pretty print table / object
@@ -1146,11 +1235,6 @@ end
 object.asIterator = function(self) -- Creates iterator from index part of table
   local pos = 0 return function() pos = pos + 1 if self[pos] then return self[pos] end end 
 end
-
--------------------------------------------
--- (alias names)
-
-object.proto = object.super
 
 ------------------------------------------------------------------
 -- Envitonment Manipulation to scope of objects
