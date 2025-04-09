@@ -103,7 +103,11 @@ local _implicitSelfObj = nil
 
 ------------ ------------ ------------ 
 -- Private method declarations
+
+------------ ------------ ------------ 
 local _isObject, _firstOrLast, _indexOf
+------------ ------------ ------------ 
+local _errorHandler, _canFunctionRun
 ------------ ------------ ------------ 
 
 local meta = {__index = self, __type = "object class", __version = Lib_Version,
@@ -132,8 +136,9 @@ object.getenv = function()
 end
 
 ------------ ------------ ------------ 
-
 -- serial - pretty print data value(s)
+------------ ------------ ------------ 
+
 local toStringHandler = function(value)
 
     local isObject = _isObject(value)
@@ -204,8 +209,10 @@ local toStringHandler = function(value)
     
 end --> returns: serial descriptor string
 
------------- ------------
+
+------------ ------------ ------------ 
 -- (top level) helpers for building object
+------------ ------------ ------------ 
 
 -------- ------ >>
 
@@ -503,6 +510,7 @@ setmetatable(object._ext,extMeta)
 -- object.init = function(self) end -- Called upon object initiation
 
 object.new = function(super,self) -- (object) - base constructor 
+    
     local meta,superMeta = {__type = "object"},getmetatable(super) meta.__index = super == object and superMeta.__proto or super
     
     -- Note (3-9-25): meta.__proto used to be set to meta.__index. This was changed to meta.__index = super. This may have unexpected effects in classes which use object (see below)
@@ -561,11 +569,13 @@ object:extend("insert")
 -- inserts at the start of a table/string
 object.insert.first = function(self,...)
     
-  local count,args = select("#",...)
+  if not _canFunctionRun{ 
+   method = "object.insert.first",
+   types = {"table","string"},
+   self = self } then return self end
     
-  if not self then 
-   error("argument 1 (self) to object.insert.first was nil.") return 
-  elseif count == 0 then return self end
+  local count,args = select("#",...)    
+  if count == 0 then return self end
   local format = type(self) 
     
   -- string handling
@@ -577,8 +587,6 @@ object.insert.first = function(self,...)
   end -- returns: (new string)
     
   -- table handling
-    
-  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.insert.first. Expected type (table|string) got: (",format,")."}) return end
 
   if count == 1 then
    table.insert(self,1,select(1,...))
@@ -598,11 +606,13 @@ end -- returns: table (self)
 -- inserts at the end of a table/string
 object.insert.last = function(self,...)
     
-  local count,args = select("#",...)
+  if not _canFunctionRun{ 
+   method = "object.insert.last",
+   types = {"table","string"},
+   self = self } then return self end  
     
-  if not self then
-   error("argument 1 (self) to object.insert.last was nil.") return
-  elseif count == 0 then return self end
+  local count,args = select("#",...)
+  if count == 0 then return self end
   local format = type(self)   
     
   -- string handling
@@ -614,8 +624,6 @@ object.insert.last = function(self,...)
   end -- returns: (new string)
     
   -- table handling
-    
-  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.insert.last. Expected type (table|string) got: (",format,")."}) return end
   
   if count == 0 then return self
   elseif count == 1 then
@@ -636,9 +644,12 @@ end -- returns: table (self)
 -- inserts at an index of a table/string
 object.insert.atIndex = function(self,index,...)
     
-  if not self then
-   error("argument 1 (self) to object.insert.atIndex was nil.") return
-  elseif count == 0 then return self end
+  if not _canFunctionRun{ 
+   method = "object.insert.atIndex",
+   types = {"table","string"},
+   self = self } then return self end
+        
+  if count == 0 then return self end
   local format = type(self)   
     
   local max,abs = #self + 1, abs
@@ -656,8 +667,6 @@ object.insert.atIndex = function(self,index,...)
   end -- returns: (new string)
     
   -- table handling
-    
-  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.insert.atIndex. Expected type (table|string) got: (",format,")."}) return end
     
   local argCount = select("#",...)
   if argCount == 1 then
@@ -712,13 +721,10 @@ object:extend("remove")
 -- removes one or more indexies from table
 object.remove.indexies = function(self,...) 
     
-  if not self then
-   error("argument 1 (self) to object.remove.indexies was nil.") 
-   return end
-    
-  local format = type(self)   
-    
-  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.remove.indexies. Expected type (table) got: (",format,")."}) return end
+  if not _canFunctionRun{ 
+   method = "object.remove.indexies",
+   types = {"table"},
+   self = self } then return end
     
   local len = select("#",...)
   if len == 1 then 
@@ -769,13 +775,10 @@ object.remove.indexies = function(self,...)
 -- removes one or more keys from table
 object.remove.keys = function(self,...)
     
-  if not self then
-   error("argument 1 (self) to object.remove.keys was nil.") 
-   return end
-    
-  local format = type(self)   
-    
-  if format ~= "table" then error(_stringifyTable{"invalid argument 1 (self: ",self,") to object.remove.keys. Expected type (table) got: (",format,")."}) return end
+  if not _canFunctionRun{ 
+   method = "object.remove.keys",
+   types = {"table"},
+   self = self } then return end
     
   local len,hash,out = select("#",...)
   if len == 1 then hash = select(1,...)
@@ -826,6 +829,8 @@ object.remove.atIndex = function(self,index,number) -- removes number of entries
         else arg = 0 for i = index,index + number + 1,-1 do if not self[index - arg] then break
                 else table.insert(out,table.remove(self,index - arg)) arg = arg + 1 end end end
     return unpack(out) end end -- returns: vararg of removed values
+
+---- ---- ------
 
 object.remove.beforeIndex = function(self,index,number) -- removes entries starting before index
     if index <= 1 then return false else max = #self; index = index > max and max or index end
@@ -1536,8 +1541,62 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
     
 end
 
+------------ ------------ ------------ 
+-- [debug] error handler / method checks
+------------ ------------ ------------ 
+
+-- used to configure error messages
+_errorHandler = function(options)
+    
+    local concat = table.concat
+    
+    local self = options.self
+    local method = options.method
+    local errorType = options.error
+    local types = options.types
+    
+    if errorType == "missingSelf" then
+     return error(_stringifyTable{"argument 1 (self) to ",method," was nil."})
+        
+    elseif errorType == "wrongType" then
+     return error(_stringifyTable{"invalid argument 1 (self : ",self,") to ", method,". Expected type", 
+      #types > 1 and "s" or "",":(",concat(types,"|"),") got:(",type(self),")."})
+    end
+    
+    --[[ ------- ----- ------- -----
+    
+    _errorHandler{error = "missingSelf", self = self, method = "object.someValue"}
+    
+    _errorHandler{error = "wrongType", self = self, method = "object.someValue", types = {"table","string"}}
+    
+    ]] ------- ----- ------- -----
+
+end
+
+-- checks if a method can run
+_canFunctionRun = function(options)
+    
+  local method = options.method
+  local types = options.types
+  local self = options.self
+    
+  if not self then
+   return _errorHandler{error = "missingSelf", self = self, method = method} end
+    
+  local format,typeMatch = type(self)  
+  for i = 1,#types do
+    if types[i] == format then
+      typeMatch = true break end
+  end
+    
+  if not typeMatch then return _errorHandler{error = "wrongType", self = self, method = method, types = types}end
+    
+  return true
+    
+end --> boolean - can method run
+
 ----- ----------- ----------- -----------
--- private methods below this point -- >>
+-- [private] - below this point -- >>
 ----- ----------- ----------- -----------
 
 -------- ------ >>
