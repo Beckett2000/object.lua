@@ -183,6 +183,12 @@ output:
 ....}
 }
 ```
+```lua
+print(tree) -- uses defaults
+```
+```
+(object[2]: 0x306f20140):{01:"leaves", 02:"bark", alpha:(table[3]: 0x306f20bc0), kind:"oak", ["1"]:"one"}
+```
 
 ------ ------ ------ ------
 
