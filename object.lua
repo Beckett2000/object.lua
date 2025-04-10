@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.08 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-9-25)
+-- object.lua - 3.08 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-10-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -98,14 +98,16 @@ local _implicitSelfObj = nil
 
 ------------ ------------ ------------ 
 local _isObject, _firstOrLast, _indexOf
------------- ------------ ------------ 
+local handleToString, _objSerialDescriptor 
 local _errorHandler, _canFunctionRun
 ------------ ------------ ------------ 
 
-local meta = {__index = self, __type = "object class", __version = Lib_Version,
+local meta = {__index = self, __type = "object class", __version = true,
+
     __tostring = function(self) -- gives objects a tostring native behavior
         local vals = {} for k,_ in pairs(self) do table.insert(vals,tostring(k)) end
     table.sort(vals) return "(object baseClass):["..table.concat(vals,", ").."]" end,
+    
     __call = function(self,...) -- creates object class from initializer
         return -- self.init and self:init(...) or 
     self:new(...) end } 
@@ -128,39 +130,80 @@ object.getenv = function()
 end
 
 ------------ ------------ ------------ 
+-- stores object config data 
+
+local function getDataStore(obj,create)
+  local meta = getmetatable(obj)
+  if not meta.__data then 
+   if create == false then return end
+   meta.__data = {} end
+  return meta.__data
+end
+
+------------ ------------ ------------ 
 -- serial - pretty print data value(s)
 ------------ ------------ ------------ 
 
-local handleToString, _objSerialDescriptor 
+----- ----- ----- ----- ----- -----
+-- default settings for string gen.
+
+local _tostringSettings = {
+    
+  ----- ----- ----- ----- ----- -----
+  -- serial printing styles [__toString]
+  -- "inline" | "block" | "vertical"
+    
+  style = "vertical",
+  indents = " ", -- indent space i.e. "\t"
+    
+  ----- ----- ----- ----- ----- -----
+  -- table / function info options
+    
+  offsets = true, -- show offsets 0x0000
+  lengths = true, -- show lengths table[2]   
+  depth = 1, -- nested table depth
+ 
+  ----- ----- -----    
+  data = {} -- used internally by the toStringHandler to keep track of states when called recursively
+  ----- ----- -----
+    
+}
 
 ------------ ------------ ------------ 
 
 -- [__tostring] handler for opject instances. Also invoked with printing options by calling object.toString on any data type (see object.toString)
 
 handleToString = function(value,opt)
-    
-   ---- --- ---- --- ---- --- ----
-   -- settings for string gen.
-    
-   local settings = {
-     offsets = true, -- show offsets 0x000   
-     depth = 1 -- nested table depth
-   } 
-    
-   ---- --- ---- --- ---- --- ----
 
    local isObject = _isObject(value)
     
-   local concat,tostring,type = 
-    table.concat,tostring,type
+   local concat,unpack = 
+    table.concat,table.unpack
+    
     local handleStr,objStr = handleToString, _objSerialDescriptor
+    
+    local settings = object.copy(_tostringSettings)
     
    local self, meta = value
    local entries,value = {} 
    local formatK,formatV,isObjectV
 
+   -- when an object with __tostring config settings is handled, the config is in the object's data store  
+    
+   if isObject then
+    local data = getDataStore(self,false)
+    if data and data.tostring then
+      settings = data.tostring    
+   end end
+
    ---- --- ---- --- ---- --- ----
    -- options to the tostringHandler
+    
+   settings.data.indents = 1
+   settings.data.nested = false
+    
+   ---- --- ---- --- ---- --- ----
+   -- [opt] - passed in options 
    
    if opt and type(opt) == "table" then
     
@@ -169,13 +212,38 @@ handleToString = function(value,opt)
         
     settings.depth = opt.depth and type(opt.depth) == "number" and floor(abs(opt.depth)) or settings.depth
         
-    end   
+    settings.style = opt.style and (opt.style == "block" or opt.style == "vertical") and opt.style or settings.style
+        
+    settings.indents = opt.indents and type(opt.indents) == "string" and opt.indents or settings.indents
+    
+    ---- --- ---- --- ---- --- ----
+    -- [opt.data] - recursive call data
+        
+    if opt.data then
+       
+      local indents = opt.data.indents
+      if indents then
+      settings.data.indents =     
+        floor(abs(opt.data.indents))
+      end
+            
+      settings.data.nested = opt.data.nested      
+        
+    end
+         
+   end   
     
    ---- --- ---- --- ---- --- ----
    -- settings to use for string gen.
     
+   local style = settings.style
+   local spacer = settings.indents 
+    
    local useOffsets = settings.offsets
    local depth = settings.depth
+    
+   local indents = settings.data.indents
+   local nested = settings.data.nested
     
    ---- --- ---- --- ---- --- ----
     
@@ -191,8 +259,6 @@ handleToString = function(value,opt)
    -- adds string data for leveles of nested tables. Defalts to level 1
    
    for key,val in pairs(self) do 
-    
-    ---- --- ---- --- ---- --- ----
         
     formatK,formatV = type(key),type(val)  
     key,notation = formatK == "number" and key < 10 and "0"..key or key
@@ -211,29 +277,49 @@ handleToString = function(value,opt)
     
     -- shows {table} / {object} pointers
     elseif formatV == "table" then
+            
      if depth <= 1 then
       value = concat{"(", objStr(val,settings),")"}
                 
-     else local options = {   
-      depth = depth - 1 }
-      for k,v in pairs(settings) do
-        if k ~= "depth" then
-         options[k] = v end
-      end value = handleStr(val,options) 
+     else -- shows {sub tables} (level > 1)
+      local options = object.copy(settings) 
+      options.depth = depth + 1
+      options.data.indents = indents + 1   
+      options.data.nested = true 
+      value = handleStr(val,options)     
      end
             
     -- annotate "strings"
     elseif formatV == "string" then value = concat{'"',val,'"'} else value = tostring(val) end 
    
+    local padding = object{}
+    if style == "vertical" then 
+     padding:push("\n",spacer)
+     for i = 1,indents do
+      padding:push(spacer)
+     end
+    end
+
+   local notation = concat{formatK == "string" and concat{padding:concat(), '["',key,'"]'} or padding:concat(), tostring(key),":",value,""}
+        
     -- shows [key:value] pairs  
-    table.insert(entries,concat{formatK == "string" and concat{'["',key,'"]'} or tostring(key),":",value,""}) 
+    table.insert(entries,notation)
         
     end
 
     ---- --- ---- --- ---- --- ----
     -- output to toString
     
-    return concat{"(",descriptor,"):{", concat(entries,", "),"}"}
+    local padding = object{}
+    if style == "vertical" then 
+     padding:push("\n")
+     if nested then
+       for i = 1,indents do
+        padding:push(spacer)
+       end end
+    end
+    
+    return concat{"(",descriptor,"):{", concat(entries,", "), padding:concat(), "}"}
     
     ---- --- ---- --- ---- --- ----
     
@@ -260,34 +346,51 @@ _objSerialDescriptor = function(obj,opt)
   local isObject = _isObject(self)
     
   ------- ------- ------- ------- ---
-  local useOffsets = opt.offsets
+  local offsetNotation = opt.offsets
+  local showLengths = opt.lengths
   ------- ------- ------- ------- ---
     
-  local meta,type,descriptor = getmetatable(self), not isObject and type(self) or self:type(), not isObject and tostring(self) or ""
+  local meta,descriptor = getmetatable(self), not isObject and tostring(self) or ""
+  local type,metaType = not isObject and type(self) or self:type(), type(meta)
     
-  if not useOffsets then return type end
+  ------- ------- ------- ------- ---
     
-  ------- ------- -------
-  if meta then -- bind
-   setmetatable(self,nil) end
+  local sep = offsetNotation and ": " or ""
+
+  -- adds length str -> i.e table[2]  
+  local length = showLengths and concat{"[",#self,"]"} or ""
+    
+  -- adds offset notation -> 0x000000
+  local offset = ""
+    
+  ------- ------- ------- ------- ---
+    
+  if offsetNotation then
+   
+   local str = descriptor
+   if not isObject and (metaType ~= "table" or metaType == "table" and meta.__tostring == nil) then
+     offset = string.match(str,"0x%x+")  
+        
+   else
+        
+    ------- ------- -------
+    if meta then -- bind
+     setmetatable(self,nil) end
+    ------- ------- -------
+
+    str = tostring(self)
+    offset = string.match(str,"0x%x+")
+        
+    ------- ------- -------
+    if meta then -- unbind
+     setmetatable(self,meta) end
+    ------- ------- -------
+        
+  end end
+        
   ------- ------- -------
 
-  -- (string: object: 0x000000)
-  if isObject then
-        
-   descriptor = tostring(self)
-        
-   local offset = string.match(descriptor,"0x%x+")
-   local objNotation = {type,offset}
-        
-   descriptor = concat(objNotation,": ")
-  
-  end
-    
-  ------- ------- -------
-  if meta then -- unbind
-   setmetatable(self,meta) end
-  ------- ------- -------
+  descriptor = concat{type,length,sep,offset}
     
   return descriptor --> returns: (string)
     
@@ -594,7 +697,7 @@ setmetatable(object._ext,extMeta)
 
 object.new = function(super,self) -- (object) - base constructor 
     
-    local meta,superMeta = {__type = "object"},getmetatable(super) meta.__index = super == object and superMeta.__proto or super
+    local meta,superMeta = {__type = "object", __data = false}, getmetatable(super) meta.__index = super == object and superMeta.__proto or super
     
     -- Note (3-9-25): meta.__proto used to be set to meta.__index. This was changed to meta.__index = super. This may have unexpected effects in classes which use object (see below)
     
@@ -1145,6 +1248,11 @@ end -- returns: vararg - indices or nils
 -- get index value range / substring of table / string values respectively
 object.range = function(self,start,fin)
     
+  if not _canFunctionRun{ 
+   method = "object.range",
+   types = {"table","string"},
+   self = self } then return end
+    
   local out,step = {}, 1
     
   if not start or not fin or type(start) ~= "number" or type(fin) ~= "number" then
@@ -1199,9 +1307,29 @@ end
 
 object.inverse = object.inverseIndexies
 
+---------- --------
+
 object.concat = function(self,sep) -- Concantinates table indexies
-  local concat = concat return concat(self,sep)
- end -- returns: "indexies..sep,... string"
+    
+  if not _canFunctionRun { 
+   method = "object.concat",
+   types = {"table"},
+   self = self } then return end
+    
+  local toString,insert = 
+    object.toString,object.insert
+  local sep = sep and toString(sep) or ""
+    
+  local strings = {}
+  for i = 1,#self do
+   insert(strings,toString(self[i]))
+   if i ~= #self then insert(strings,sep)
+  end end
+    
+  local concat = table.concat
+  return concat(strings)
+        
+ end -- returns: (string) - table indexes converted into a string
 
 ---------- -------- ----------
 
@@ -1285,16 +1413,68 @@ object.isOfType = object.isTypeOf
 ----- ------ ------ ------ ------ ------
 
 object.toString = function(self,options) 
-    
+
   if not _canFunctionRun { 
    method = "object.toString",
    types = {"table","string","number",
     "function","boolean","nil"},
    self = self } then return end
+
+  -- certain types are passed through to tostring unchanged
+    
+  local type = type(self)
+  if type == "string" then return self
+  elseif type == "boolean" or type == "number" or type == "nil" then
+   return tostring(self)     
+  end
+    
+  -- tables and functions are passed to the toStringHandler
     
   return handleToString(self,options)
     
 end
+
+object:extend("toString")
+
+---- ---- ---- ----
+-- (__tostring) - sets default behavior for  converting an object instance to a string
+
+object.toString.config = function(self,opt)
+
+  if not _canFunctionRun { 
+   method = "object.toString.config",
+   types = {"table"}, isObject = true,
+   self = self } then return end
+
+  if type(opt) ~= "table" then
+   return end
+    
+  local data = getDataStore(self)
+  if not data.tostring then
+   data.tostring =
+    object.copy(_tostringSettings)
+  end
+    
+  local settings = data.tostring
+    
+  if type(opt.offsets) == "boolean" then 
+   settings.offsets = opt.offsets end
+  if type(opt.depth) == "number" then 
+   settings.depth = opt.depth end
+  if type(opt.lengths) == "boolean" then 
+   settings.lengths = opt.lengths end
+  if type(opt.indents) == "string" then 
+   settings.indents = opt.indents end
+    
+end
+
+---------- -------- ----------
+
+-- Note: This could only work outside of an object scope -- WIP
+
+-- object.tostring = object.toString
+
+---------- -------- ----------
 
 ----- ------ ------- -------- --------
 -- Access instance metatables and super classes / prorotypes
@@ -1370,12 +1550,6 @@ object.closest = function(self,object)
 end
 
 ]]
-
----------- -------- ----------
-
--- Note / TBD: This could only work outside of an object scope -- WIP
-
--- object.tostring = object.toString
 
 ------------------------------------------------------------------
 -- Extra Utility Methods
@@ -1701,18 +1875,13 @@ _errorHandler = function(options)
     if errorType == "missingSelf" then
      return error(_stringifyTable{"argument 1 (self) to ",method," was nil."})
         
+    elseif errorType == "notObject" then
+     return error(_stringifyTable{"argument 1 (self) to ",method," was was not an instance of object."})
+        
     elseif errorType == "wrongType" then
      return error(_stringifyTable{"invalid argument 1 (self : ",self,") to ", method,". Expected type", 
       #types > 1 and "s" or "",":(",concat(types,"|"),") got:(",type(self),")."})
     end
-    
-    --[[ ------- ----- ------- -----
-    
-    _errorHandler{error = "missingSelf", self = self, method = "object.someValue"}
-    
-    _errorHandler{error = "wrongType", self = self, method = "object.someValue", types = {"table","string"}}
-    
-    ]] ------- ----- ------- -----
 
 end
 
@@ -1733,6 +1902,8 @@ _canFunctionRun = function(options)
   end
     
   if not typeMatch then return _errorHandler{error = "wrongType", self = self, method = method, types = types}end
+
+  if options.isObject == true and not _isObject(self) then return _errorHandler{error = "notObject", self = self, method = method} end
     
   return true
     
