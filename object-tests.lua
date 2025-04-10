@@ -4,6 +4,44 @@
 if true then return end
 ----- ----- ----- ----- ----- -----
 
+testPrettyPrint = function()
+
+   ------ ------ ------ ------>>
+
+   local tree = object{"leaves","bark",
+     kind = "oak",["1"]="one",alpha = {"a","b","c"}}
+    
+    print(tree:toString{
+      ---- ---- ---- ----
+      style = "vertical",
+      depth = 2,
+      spacer = "..",
+      ---- ---- ---- ----
+      offsets = true
+      lengths = true
+      ---- ---- ---- ----
+    })
+
+    ------ ------ ------ ------>>
+
+    --[[ output:
+
+      (object[2]: 0x306f20140):{
+      ....01:"leaves", 
+      ....02:"bark", 
+      ....["1"]:"one", 
+      ....kind:"oak", 
+      ....alpha:(table[3]: 0x306f20bc0):{
+      ......01:"a", 
+      ......02:"b", 
+      ......03:"c"
+      ....}
+      }
+
+    ]]
+
+end
+
 testToString = function()
 
    local tree = object{"leaves","bark",
@@ -33,7 +71,7 @@ testToString = function()
     
     multiArray.toString:config{
       offsets = false,
-      indents = " ",
+      spacer = " ",
       lengths = true,
       depth = 2
     }
