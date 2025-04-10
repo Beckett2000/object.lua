@@ -154,7 +154,7 @@ local _tostringSettings = {
   -- "inline" | "block" | "vertical"
     
   style =  "inline", -- "vertical",
-  indents = " ", -- indent space i.e. "\t"
+  spacer = " ", -- indent space i.e. "\t"
     
   ----- ----- ----- ----- ----- -----
   -- table / function info options
@@ -214,7 +214,7 @@ handleToString = function(value,opt)
         
     settings.style = opt.style and (opt.style == "block" or opt.style == "vertical") and opt.style or settings.style
         
-    settings.indents = opt.indents and type(opt.indents) == "string" and opt.indents or settings.indents
+    settings.spacer = opt.spacer and type(opt.spacer) == "string" and opt.spacer or settings.spacer
     
     ---- --- ---- --- ---- --- ----
     -- [opt.data] - recursive call data
@@ -237,7 +237,7 @@ handleToString = function(value,opt)
    -- settings to use for string gen.
     
    local style = settings.style
-   local spacer = settings.indents 
+   local spacer = settings.spacer 
     
    local useOffsets = settings.offsets
    local depth = settings.depth
@@ -1446,12 +1446,12 @@ local function getToStringSettings()
     style = "string", -- 'vertical'|'block' 
     ------ ----- -------- ---- -----   
     -- [pretty print] --> spacer string        
-    indents = "string" -- "\t"," ",etc.
+    spacer = "string" -- "\t"," ",etc.
         
   } ------ ------ ------
   ---------- ---------- ---------- ------
     
-  return settings -- returns --> {table}
+  return settings ---> returns: {table}
     
 end
 
