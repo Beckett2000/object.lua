@@ -15,12 +15,13 @@ testToString = function()
     
   local tree = object{"leaves","bark",
    kind = "oak", ["1Value"] = "one", ["two"]=20}
-    
-  -- (object[2]: 0x311ca5980):{01:"leaves", 02:"bark", kind:"oak", two:20, ["1Value"]:"one"}
-    
+  
   print(tree) 
 
+  -- (object[2]: 0x311ca5980):{01:"leaves", 02:"bark", kind:"oak", two:20, ["1Value"]:"one"}
+    
 end
+
 
 testToString = function()
     
