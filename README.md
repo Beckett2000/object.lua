@@ -51,7 +51,7 @@ Note: In the case of object.insert, the key of insert (on the object) is a custo
 -- syntax options -> i.e. object.insert.first
 -- note: this uses object:extend("insert") - WIP
 
-local myObject = object{}
+local myObject = object{"bar"}
 local val = "foo"
 
 -- These would all have the same effect ...
@@ -66,6 +66,9 @@ object.insert.first(val) -- with (dotObjectRef) flag
 ---- ----- ----- ----- 
 object:unshift(val) -- alias
 ---- ----- ----- ----- 
+
+-- output:
+-- (object[2]):{01:"foo", 02:"bar"}
 
 ```
 ------ ------ ------ ------
