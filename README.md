@@ -49,7 +49,7 @@ Note: In the case of object.insert, the key of insert (on the object) is a custo
 
 ```
 -- syntax options -> i.e. object.insert.first
--- note: this uses object:extend("insert") - WIP
+-- note: this is implemented in the object base class using object:extend("insert"). It should later also work on subclasses without unexpected overrides. - WIP
 
 local myObject = object{"bar"}
 local val = "foo"
