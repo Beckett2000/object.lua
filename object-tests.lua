@@ -5,6 +5,24 @@ if true then return end
 ----- ----- ----- ----- ----- -----
 
 testToString = function()
+
+   local tree = object{"leaves","bark",
+    kind = "oak", [function() end] = "foo",["1"]="one",[{"a","b","c"}]= "alpha"}
+    
+   print(tree) 
+    
+  -- (object[2]: 0x311d87500):{01:"leaves", 02:"bark", [(function: 0x15584d880)]:"foo", kind:"oak", [(table[3]: 0x311d85a00)]:"alpha", ["1"]:"one"}
+    
+  local tree = object{"leaves","bark",
+   kind = "oak", ["1Value"] = "one", ["two"]=20}
+    
+  -- (object[2]: 0x311ca5980):{01:"leaves", 02:"bark", kind:"oak", two:20, ["1Value"]:"one"}
+    
+  print(tree) 
+
+end
+
+testToString = function()
     
     local tree = object{"leaves"}
     
