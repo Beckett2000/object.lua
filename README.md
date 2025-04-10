@@ -156,18 +156,17 @@ object.meta
 object.super | object.prototype | object.proto
 ```
 
+---------- ---------- ---------- ------
+
+Logging / Pretty Print: 
+object has a (.toString) method which can be used to handle converting lua data to strings and decorating them in the serial display.
+
+---------- ---------- ---------- ------
+
 ```lua
  object.toString(value,options) --> string (see __tostring below)
  object.concat(table,sep) --> string
 ```
-
----------- ---------- ---------- ------
-
-Logging / Pretty Print: object has a (.toString) method which can be used to handle converting lua data to strings and decorating them in the serial display.
-
----------- ---------- ---------- ------
-
-__toString Settings / Options
 
 ```lua
 
