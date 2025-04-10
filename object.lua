@@ -1425,10 +1425,35 @@ object.isOfType = object.isTypeOf
 
 -- The object.toString function can take an optional second argument which is passed to the toStringHandler to provide more printing options / formats.
 
---   options: {
---     offsets: true/false - dft. true
---     depth: number - dft. 1
---   }
+local function getToStringSettings()
+    
+  ---------- ---------- ---------- ------
+  --> __tostring settings: [name]:type
+    
+  local settings = { ------ ------ ----
+        
+    -- show offsets --> table: 0x311d85a00
+    offsets = "boolean", -- true|false
+    ------ ----- -------- ---- -----    
+    -- show lengths --> table[3]: {a,b,c}  
+    lengths = "boolean", -- true|false
+    ------ ----- -------- ---- -----   
+     -- show sub tables --> {a,b,c,{d,e}}
+    depth = "number", -- (0 -> math.huge)
+    -- <----- <----- <----- <----- <---
+    -----> -----> -----> -----> ----->
+    -- [pretty print] --> style name    
+    style = "string", -- 'vertical'|'block' 
+    ------ ----- -------- ---- -----   
+    -- [pretty print] --> spacer string        
+    indents = "string" -- "\t"," ",etc.
+        
+  } ------ ------ ------
+  ---------- ---------- ---------- ------
+    
+  return settings -- returns --> {table}
+    
+end
 
 ----- ------ ------ ------ ------ ------
 
@@ -1477,12 +1502,9 @@ object.toString.config = function(self,opt)
     
   local tostringSettings = data.tostring
     
-  -- possible settings: [name]:type
-  local settings = { ------ ------ ----
-    offsets = "boolean", depth = "number", 
-    lengths = "number", indents = "number", 
-    style = "string"    
-  } ------ ------ ------
+  ---------- ---------- ---------- ------
+  local settings = getToStringSettings()
+  ---------- ---------- ---------- ------
     
   for k,v in pairs(opt) do
     local setting = settings[k]
