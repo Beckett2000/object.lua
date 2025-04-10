@@ -17,7 +17,7 @@ testPrettyPrint = function()
       depth = 2,
       spacer = "..",
       ---- ---- ---- ----
-      offsets = true
+      offsets = true,
       lengths = true
       ---- ---- ---- ----
     })
