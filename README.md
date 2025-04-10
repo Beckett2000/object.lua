@@ -110,6 +110,80 @@ object.toString
 
 ```
 
+---------- ---------- ---------- ------
+
+Logging / Pretty Print: object has a (.toString) method which can be used to handle converting lua data to strings and decorating them in the serial display.
+
+```lua
+  local tree = object{"leaves","bark",
+     kind = "oak", ["1"]="one", alpha = {"a","b","c"}}
+    
+    print(tree:toString{
+      ---- ---- ---- ----
+      style = "vertical",
+      depth = 2,
+      spacer = "..",
+      ---- ---- ---- ----
+      offsets = true,
+      lengths = true
+      ---- ---- ---- ----
+    })
+```
+
+---------- ---------- ---------- ------
+
+__toString Settings / Options
+
+```lua
+
+local function getToStringSettings()
+    
+  ---------- ---------- ---------- ------
+  --> __tostring settings: [name]:type
+    
+  local settings = { ------ ------ ----
+        
+    -- show offsets --> table: 0x311d85a00
+    offsets = "boolean", -- true|false
+    ------ ----- -------- ---- -----    
+    -- show lengths --> table[3]: {a,b,c}  
+    lengths = "boolean", -- true|false
+    ------ ----- -------- ---- -----   
+     -- show sub tables --> {a,b,c,{d,e}}
+    depth = "number", -- (0 -> math.huge)
+    -- <----- <----- <----- <----- <---
+    -----> -----> -----> -----> ----->
+    -- [pretty print] --> style name    
+    style = "string", -- 'vertical'|'block' 
+    ------ ----- -------- ---- -----   
+    -- [pretty print] --> spacer string        
+    spacer = "string" -- "\t"," ",etc.
+        
+  } ------ ------ ------
+  ---------- ---------- ---------- ------
+    
+  return settings ---> returns: {table}
+    
+end
+
+```
+
+Output:
+
+```
+      (object[2]: 0x306f20140):{
+      ....01:"leaves", 
+      ....02:"bark", 
+      ....["1"]:"one", 
+      ....kind:"oak", 
+      ....alpha:(table[3]: 0x306f20bc0):{
+      ......01:"a", 
+      ......02:"b", 
+      ......03:"c"
+      ....}
+      }
+```
+
 ------ ------ ------ ------
 
 Chaining: Calls which return an object can be chained
