@@ -153,7 +153,7 @@ local _tostringSettings = {
   -- serial printing styles [__toString]
   -- "inline" | "block" | "vertical"
     
-  style = "vertical",
+  style =  "inline", -- "vertical",
   indents = " ", -- indent space i.e. "\t"
     
   ----- ----- ----- ----- ----- -----
@@ -300,28 +300,48 @@ handleToString = function(value,opt)
      end
     end
 
-   local notation = concat{formatK == "string" and concat{padding:concat(), '["',key,'"]'} or padding:concat(), tostring(key),":",value,""}
+   -- formats key / index display    
+   local keyForm = object{padding:concat()}
         
-    -- shows [key:value] pairs  
-    table.insert(entries,notation)
+   if formatK == "number" then 
+    keyForm:push(tostring(key))
+   elseif formatK == "function" then
+    local str = useOffsets and tostring(key) or type(key)
+    keyForm:push('[(',str,')]')
+   elseif formatK == "table" then 
+    local str = objStr(key,settings)
+    keyForm:push('[(',str,')]')    
+             
+   elseif formatK == "string" then
+    local varName = "^%a[%w_]*$"
+    if key:match(varName) then
+     keyForm:push(key)  
+    else keyForm:push('["',key,'"]') end
+         
+   else keyForm:push(tostring(key)) end
+   keyForm:push(":",value,"")  
+   
+   -- shows [key:value] pairs  
+   local notation = keyForm:concat()
+   table.insert(entries,notation)    
         
-    end
+   end
 
-    ---- --- ---- --- ---- --- ----
-    -- output to toString
+   ---- --- ---- --- ---- --- ----
+   -- output to toString
     
-    local padding = object{}
-    if style == "vertical" then 
-     padding:push("\n")
-     if nested then
-       for i = 1,indents do
-        padding:push(spacer)
-       end end
-    end
+   local padding = object{}
+   if style == "vertical" then 
+    padding:push("\n")
+    if nested then
+     for i = 1,indents do
+      padding:push(spacer)
+    end end
+   end
     
-    return concat{"(",descriptor,"):{", concat(entries,", "), padding:concat(), "}"}
+   return concat{"(",descriptor,"):{", concat(entries,", "), padding:concat(), "}"}
     
-    ---- --- ---- --- ---- --- ----
+   ---- --- ---- --- ---- --- ----
     
 end --> returns: serial descriptor string
 
@@ -1455,16 +1475,21 @@ object.toString.config = function(self,opt)
     object.copy(_tostringSettings)
   end
     
-  local settings = data.tostring
+  local tostringSettings = data.tostring
     
-  if type(opt.offsets) == "boolean" then 
-   settings.offsets = opt.offsets end
-  if type(opt.depth) == "number" then 
-   settings.depth = opt.depth end
-  if type(opt.lengths) == "boolean" then 
-   settings.lengths = opt.lengths end
-  if type(opt.indents) == "string" then 
-   settings.indents = opt.indents end
+  -- possible settings: [name]:type
+  local settings = { ------ ------ ----
+    offsets = "boolean", depth = "number", 
+    lengths = "number", indents = "number", 
+    style = "string"    
+  } ------ ------ ------
+    
+  for k,v in pairs(opt) do
+    local setting = settings[k]
+    if setting and type(v) == setting then
+     tostringSettings[k] = v        
+    end
+  end
     
 end
 
@@ -1876,7 +1901,7 @@ _errorHandler = function(options)
      return error(_stringifyTable{"argument 1 (self) to ",method," was nil."})
         
     elseif errorType == "notObject" then
-     return error(_stringifyTable{"argument 1 (self) to ",method," was was not an instance of object."})
+     return error(_stringifyTable{"argument 1 (self) to ",method," was not an instance of object."})
         
     elseif errorType == "wrongType" then
      return error(_stringifyTable{"invalid argument 1 (self : ",self,") to ", method,". Expected type", 
