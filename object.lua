@@ -24,16 +24,8 @@ math.min,math.max, math.pow,math.acos,math.floor,math.sqrt
 
 ----- ----- ----- ----- ----- -----
 
-if not object then
-    
-  object = {
-    libs = {}, 
-    _initial = {
-      global = _ENV, 
-      pointer = function() end}, 
-    stack = {}
-  }
-    
+if not object then   
+  object = {libs = {}, stack = {}}    
 end
 
 ----- ----- ----- ----- ----- -----
@@ -139,36 +131,71 @@ end
 -- serial - pretty print data value(s)
 ------------ ------------ ------------ 
 
-local _objSerialDescriptor
+local handleToString, _objSerialDescriptor 
 
 ------------ ------------ ------------ 
 
-local toStringHandler = function(value)
-    
-    local isObject = _isObject(value)
+-- [__tostring] handler for opject instances. Also invoked with printing options by calling object.toString on any data type (see object.toString)
 
-    ---- --- ---- --- ---- --- ----
-    -- In case of debugging -> use / uncomment this next line ...
+handleToString = function(value,opt)
     
-    -- if isObject then return "nil" end
-    ---- --- ---- --- ---- --- ----
+   ---- --- ---- --- ---- --- ----
+   -- settings for string gen.
+    
+   local settings = {
+     offsets = true, -- show offsets 0x000   
+     depth = 1 -- nested table depth
+   } 
+    
+   ---- --- ---- --- ---- --- ----
+
+   local isObject = _isObject(value)
     
    local concat,tostring,type = 
     table.concat,tostring,type
+    local handleStr,objStr = handleToString, _objSerialDescriptor
     
    local self, meta = value
    local entries,value = {} 
    local formatK,formatV,isObjectV
+
+   ---- --- ---- --- ---- --- ----
+   -- options to the tostringHandler
+   
+   if opt and type(opt) == "table" then
+    
+    if type(opt.offsets) == "boolean" then
+     settings.offsets = opt.offsets end
+        
+    settings.depth = opt.depth and type(opt.depth) == "number" and floor(abs(opt.depth)) or settings.depth
+        
+    end   
     
    ---- --- ---- --- ---- --- ----
-   -- data value stringification
+   -- settings to use for string gen.
     
+   local useOffsets = settings.offsets
+   local depth = settings.depth
+    
+   ---- --- ---- --- ---- --- ----
+    
+   local descriptor = type(self)
+   if descriptor == "table" then descriptor = objStr(self,settings) end
+    
+   if depth == 0 then
+    return concat{"(",descriptor,")"}
+   end
+
+   ---- --- ---- --- ---- --- ----
+   -- (depth) data value stringification
+   -- adds string data for leveles of nested tables. Defalts to level 1
+   
    for key,val in pairs(self) do 
     
     ---- --- ---- --- ---- --- ----
         
     formatK,formatV = type(key),type(val)  
-    key = formatK == "number" and key < 10 and "0"..key or key
+    key,notation = formatK == "number" and key < 10 and "0"..key or key
         
     if formatV == "table" then
       meta,isObjectV = getmetatable(val), _isObject(val)
@@ -179,14 +206,21 @@ local toStringHandler = function(value)
     
     -- shows function() pointers  
     if formatV == "function" then
-     value = concat{"(",tostring(val),")"}
-    -- shows {object} pointers 
-    elseif isObjectV then 
-     value = concat{"(", _objSerialDescriptor(val),")"} 
+     notation = useOffsets and tostring(val) or type(val)
+     value = concat{"(",notation,")"}
     
-    -- shows {table} pointers   
-    elseif formatV == "table" and meta and meta.__tostring then value = tostring(val) 
-    elseif formatV == "table" then value = concat{"(",tostring(val),")"} 
+    -- shows {table} / {object} pointers
+    elseif formatV == "table" then
+     if depth <= 1 then
+      value = concat{"(", objStr(val,settings),")"}
+                
+     else local options = {   
+      depth = depth - 1 }
+      for k,v in pairs(settings) do
+        if k ~= "depth" then
+         options[k] = v end
+      end value = handleStr(val,options) 
+     end
             
     -- annotate "strings"
     elseif formatV == "string" then value = concat{'"',val,'"'} else value = tostring(val) end 
@@ -197,10 +231,9 @@ local toStringHandler = function(value)
     end
 
     ---- --- ---- --- ---- --- ----
-    -- (top level) -- output to toString
+    -- output to toString
     
-    local type = not isObject and type(self) or _objSerialDescriptor(self)
-    return concat{"(",type,"):{",concat(entries,", "),"}"}
+    return concat{"(",descriptor,"):{", concat(entries,", "),"}"}
     
     ---- --- ---- --- ---- --- ----
     
@@ -210,28 +243,53 @@ end --> returns: serial descriptor string
 
 -- helper: gets a short string notation for object instances for the toStringHandler
 
-_objSerialDescriptor = function(obj)
+_objSerialDescriptor = function(obj,opt)
     
-  local concat = table.concat
+  if not _canFunctionRun { 
+   method = "_objSerialDescriptor",
+   types = {"table"}, 
+   self = obj } then
+    return tostring(obj) end
+    
+  ------- ------- ------- ------- ---
+    
+  local concat,getmetatable,setmetatable = table.concat,getmetatable,setmetatable
     
   local self = obj
+  local meta,descriptor
   local isObject = _isObject(self)
-  if not isObject then 
-   return tostring(val) end
     
-  local meta,type = 
-    self:meta(), self:type()
+  ------- ------- ------- ------- ---
+  local useOffsets = opt.offsets
+  ------- ------- ------- ------- ---
     
-  setmetatable(self,nil) -- bind
+  local meta,type,descriptor = getmetatable(self), not isObject and type(self) or self:type(), not isObject and tostring(self) or ""
     
-  local rawString = tostring(self)
-  local offset = string.match(rawString,"0x%x+")
-  local objNotation = {type,offset}
-  type = concat(objNotation,": ")
+  if not useOffsets then return type end
+    
+  ------- ------- -------
+  if meta then -- bind
+   setmetatable(self,nil) end
+  ------- ------- -------
+
+  -- (string: object: 0x000000)
+  if isObject then
         
-  setmetatable(self,meta) -- unbind
+   descriptor = tostring(self)
+        
+   local offset = string.match(descriptor,"0x%x+")
+   local objNotation = {type,offset}
+        
+   descriptor = concat(objNotation,": ")
+  
+  end
     
-  return type
+  ------- ------- -------
+  if meta then -- unbind
+   setmetatable(self,meta) end
+  ------- ------- -------
+    
+  return descriptor --> returns: (string)
     
 end
 
@@ -1176,7 +1234,7 @@ object.isTypeOf = function(self,...)
         local argType = type(arg)    
         
         -- (object) - object pointer
-        if argType == "table" and baseType == "table" and self.isObject and self.isObject() == true and _isObject(arg) then
+        if argType == "table" and baseType == "table" and _isObject(self) and _isObject(self) == true and _isObject(arg) then
             
             local proto = self:proto()
             local match = false
@@ -1213,7 +1271,33 @@ end
 object.isInstanceOf = object.isTypeOf
 object.isOfType = object.isTypeOf
 
----------- -------- ----------
+----- ------ ------- -------- ---------
+-- [:toString] - pretty print data
+----- ------ ------- -------- ---------
+
+-- The object.toString function can take an optional second argument which is passed to the toStringHandler to provide more printing options / formats.
+
+--   options: {
+--     offsets: true/false - dft. true
+--     depth: number - dft. 1
+--   }
+
+----- ------ ------ ------ ------ ------
+
+object.toString = function(self,options) 
+    
+  if not _canFunctionRun { 
+   method = "object.toString",
+   types = {"table","string","number",
+    "function","boolean","nil"},
+   self = self } then return end
+    
+  return handleToString(self,options)
+    
+end
+
+----- ------ ------- -------- --------
+-- Access instance metatables and super classes / prorotypes
 
 object.meta = function(self) -- Creates object reference to metatable
   local meta = getmetatable return meta(self)
@@ -1221,34 +1305,13 @@ object.meta = function(self) -- Creates object reference to metatable
 
 object.super = function(self) -- Returns super class / prototype of object
   return getmetatable(self).__proto end 
-object.prototype = object.super -- alias for object.super
 
+-- alias for object.super
+object.prototype = object.super 
 object.proto = object.super
 
----------- -------- ----------
+----- ------ ------- -------- --------
 
-object.toString = function(...) -- Pretty print table / object
-    
-    local count = select("#",...)
-    local strings = {}
-    
-    ---- ------ ------
-    
-    for i = 1, count do
-     local string = toStringHandler(select(i,...))
-     if count == 1 then return string end
-      table.insert(strings,string)
-    end
-    
-    ---- ------ ------
-    
-    if count ~= 1 then return 
-     table.unpack(strings) 
-    end
-    
-end
-
----------- -------- ----------
 -- Binding Methods
 
 -- TBD - Binding to a super which is already part of an object should do nothing. Binding a table to an object should do what? binding an object to an object with the same super should make a multiple inherited object and change the bindee object to this object. The bindees super doesnt directly become the object which it is bound to
@@ -1443,7 +1506,7 @@ end
 local _getGlobalScope = function()
     
     if _VERSION ~= "Lua 5.1" then
-      local scope = initial.global
+      local scope -- = initial.global
       -- print("This is the scope:",scope)
       if not scope then scope = _ENV end
       return scope
@@ -1775,7 +1838,7 @@ local meta = getmetatable(object) -- Allows object class to have independent ext
 
  setmetatable(_object,{__index = object, __call = meta.__call, 
   __version = meta.version, __type = "object env", __proto = object,
-  __tostring = toStringHandler })
+  __tostring = handleToString })
 
 object = _object; initExtensionLayer(object) -- updates object alias pointer
 
