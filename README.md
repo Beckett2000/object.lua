@@ -15,24 +15,24 @@ print("Hello object!")
 ```
 
 ------ ------ ------ ------
+This class has a collection of methoda and functionality which could be used to build and debug code when working in Lua. There are also certain structures which can make code structures feel like other scripting languages.
+------ ------ ------ -----
 
-Insert / Remove (_.insert, _.remove) - Custom Object Syntax - (prefix)
+Custom Object Syntax
 
-These prefix extensions search for the insert or remove prefix when referenced to create custom method call blocks. Using the declaration syntax, subclasses can append custom local methods to these extensions. The usage structure is below:
+```
+-- These prefix extensions search for the insert or remove prefix when referenced to create custom method call blocks. Using the declaration syntax, subclasses can append custom local methods to these extensions. The usage structure is below:
 Declaration: object.|insert/remove|Extension IE: object.insertValue
 Calling Syntax Examples: 
 
+object:insertValue() 
+
+object.insert:value() / object.insert:Value()
+object.insert.value() / object.insert.Value() 
+
+object:insert():Value() / object:insert():value()
+object:insert().Value() / object:insert().value()
 ```
-  object:insertValue() 
-
-  object.insert:value() / object.insert:Value()
-  object.insert.value() / object.insert.Value() 
-
-  object:insert():Value() / object:insert():value()
-  object:insert().Value() / object:insert().value()
-```
-
------- ------ ------ ------
 
 Usage example:
 
@@ -73,7 +73,7 @@ object:unshift(val) -- alias
 ```
 ------ ------ ------ ------
 
-(_.insert) extension / custom object
+`object.insert` - extension / custom object
 
 ```lua
  object.insert.first(self,...) --> self
@@ -92,7 +92,7 @@ object.insert.keysFromTable
 
 ------ ------ ------ ------
 
-(_.remove) extension / custom object
+`object.renove` - extension / custom object
 
 ```lua
  object.remove.indexies(self,...) --> vararg - removals
@@ -117,7 +117,7 @@ object.remove.entries
 
 ------ ------ ------ ------
 
-(_.first / _.last) extensions / custom objects
+`object.first` / `object.last` - extensions / custom objects
 
 ```lua
 
