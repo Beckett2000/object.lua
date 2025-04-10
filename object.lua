@@ -139,8 +139,12 @@ end
 -- serial - pretty print data value(s)
 ------------ ------------ ------------ 
 
-local toStringHandler = function(value)
+local _objSerialDescriptor
 
+------------ ------------ ------------ 
+
+local toStringHandler = function(value)
+    
     local isObject = _isObject(value)
 
     ---- --- ---- --- ---- --- ----
@@ -149,66 +153,87 @@ local toStringHandler = function(value)
     -- if isObject then return "nil" end
     ---- --- ---- --- ---- --- ----
     
-   local self = value
-   local entries,value,formatK,formatV,meta = {} 
+   local concat,tostring,type = 
+    table.concat,tostring,type
+    
+   local self, meta = value
+   local entries,value = {} 
+   local formatK,formatV,isObjectV
     
    ---- --- ---- --- ---- --- ----
    -- data value stringification
     
-   for k,v in pairs(self) do 
-    
-    formatK,formatV = type(k),type(v) 
-    k = formatK == "number" and k < 10 and "0"..k or k
-        
-    meta = formatV == "table" and getmetatable(v)
-    if formatV == "function" then value = "(lua function)" -- lua function handling
-    elseif formatV == "table" and meta and meta.__type then -- object handling
-     if meta.__tostring then value = tostring(v)
-     elseif meta.__type then value = "("..tostring(meta.__type)..")" end
-    elseif formatV == "table" and meta and meta.__tostring then value = tostring(v) 
-    elseif formatV == "table" then value = "(lua table)" -- lua table handling
-    elseif formatV == "string" then value = '"'..v..'"' else value = tostring(v) end 
-    table.insert(entries,(formatK == "string" and '["'..k..'"]' or tostring(k))..":"..value.."") end
+   for key,val in pairs(self) do 
     
     ---- --- ---- --- ---- --- ----
-    -- table vs. object handling
-    
-    local rawType = type(self)
-    local isTable = rawType == "table" or rawString == "table"
-    local type = not isTable and rawType or (isObject and object.type(self)) or tostring(self)
-    
-     ---- --- ---- --- ---- --- ----
-     -- object handling
-    
-     if isObject then
         
-      local meta = getmetatable(self)
-      setmetatable(self,nil) -- bind
-    
-       local rawString = tostring(self)
-        local offset = string.match(rawString,"0x%x+")
-       local objNotation = {type,offset}
-       type = table.concat(objNotation,": ")
+    formatK,formatV = type(key),type(val)  
+    key = formatK == "number" and key < 10 and "0"..key or key
         
-      setmetatable(self,meta) -- unbind
+    if formatV == "table" then
+      meta,isObjectV = getmetatable(val), _isObject(val)
+    else meta,isObjectV = nil,false end
         
-     end
-    
     ---- --- ---- --- ---- --- ----
-    -- output to serial
+    -- (sub level) table entry notation
     
-    local stringification = table.concat{"(",type,"):{",table.concat(entries,", "),"}"}
+    -- shows function() pointers  
+    if formatV == "function" then
+     value = concat{"(",tostring(val),")"}
+    -- shows {object} pointers 
+    elseif isObjectV then 
+     value = concat{"(", _objSerialDescriptor(val),")"} 
     
-     if count ~= 1 then 
-      return stringification
+    -- shows {table} pointers   
+    elseif formatV == "table" and meta and meta.__tostring then value = tostring(val) 
+    elseif formatV == "table" then value = concat{"(",tostring(val),")"} 
             
-     else  table.insert(strings,stringification)
-     end
+    -- annotate "strings"
+    elseif formatV == "string" then value = concat{'"',val,'"'} else value = tostring(val) end 
+   
+    -- shows [key:value] pairs  
+    table.insert(entries,concat{formatK == "string" and concat{'["',key,'"]'} or tostring(key),":",value,""}) 
+        
+    end
+
+    ---- --- ---- --- ---- --- ----
+    -- (top level) -- output to toString
+    
+    local type = not isObject and type(self) or _objSerialDescriptor(self)
+    return concat{"(",type,"):{",concat(entries,", "),"}"}
     
     ---- --- ---- --- ---- --- ----
     
 end --> returns: serial descriptor string
 
+------------ ------------ ------------ 
+
+-- helper: gets a short string notation for object instances for the toStringHandler
+
+_objSerialDescriptor = function(obj)
+    
+  local concat = table.concat
+    
+  local self = obj
+  local isObject = _isObject(self)
+  if not isObject then 
+   return tostring(val) end
+    
+  local meta,type = 
+    self:meta(), self:type()
+    
+  setmetatable(self,nil) -- bind
+    
+  local rawString = tostring(self)
+  local offset = string.match(rawString,"0x%x+")
+  local objNotation = {type,offset}
+  type = concat(objNotation,": ")
+        
+  setmetatable(self,meta) -- unbind
+    
+  return type
+    
+end
 
 ------------ ------------ ------------ 
 -- (top level) helpers for building object
@@ -805,20 +830,87 @@ object.remove.keys = function(self,...)
   end end end 
     
  return unpack(out,1,len) end -- output (removed values)
-    
+
 ---- ---- ------
 
-object.remove.first = function(self,number) -- removes number of entries from beginning of table
-    if not number or number == 1 or number == -1 then return table.remove(self,1) 
-    elseif number == 0 then return false end local out = {} number = abs(number) 
-    for i = 1,number do out[i] = table.remove(self,1) end
+-- remove index value(s) from table start
+object.remove.first = function(self,number) 
+    
+  if not _canFunctionRun{ 
+   method = "object.remove.first",
+   types = {"table"},
+   self = self } then return end
+    
+  if not number or number == 1 or number == -1 then return table.remove(self,1)  
+  elseif number == 0 then return end 
+    
+  local out = {} number = abs(number) 
+  for i = 1,number do out[i] = table.remove(self,1) end
+    
+ return unpack(out) end -- returns: vararg of removed values
+
+---- ---- ------
+
+-- remove index value(s) from table end
+object.remove.last = function(self,number) 
+    
+  if not _canFunctionRun{ 
+   method = "object.remove.last",
+   types = {"table"},
+   self = self } then return end
+    
+  if not number or number == 1 or number == -1 then return table.remove(self,#self) 
+  elseif number == 0 then return end
+    
+  local reps,out = #self + 1,{} number = abs(number) 
+  for i = 1,number do out[1 + number - i] = table.remove(self,reps - i) end
+    
+ return unpack(out) end -- returns: vararg of removed values
+
+---- ---- ------
+
+-- remove value(s) from a table which are stored before a certain indice
+object.remove.beforeIndex = function(self,index,number) 
+    
+  if not _canFunctionRun{ 
+   method = "object.remove.beforeIndex",
+   types = {"table"},
+   self = self } then return end
+    
+  if index <= 1 then return false else max = #self; index = index > max and max or index end
+    
+  number = number and abs(number) or math.huge local out = {} 
+    
+  for i = 1,number do index = index - 1 
+   if self[index] then 
+    out[i] = table.remove(self,index) 
+   else break end end
+    
+return unpack(out) end -- returns: vararg of removed values   
+
+---- ---- ------
+
+-- remove value(s) from a table which are stored after a certain indice
+object.remove.afterIndex = function(self,index,number) 
+    
+  if not _canFunctionRun{ 
+   method = "object.remove.afterIndex",
+   types = {"table"},
+   self = self } then return end
+    
+  local max = #self; 
+  index = index <= 1 and 2 or index > max and max + 1 or index + 1 
+    
+  number = number and abs(number) or math.huge local out = {} 
+    
+  for i = 1,number do 
+   if self[index] then
+    out[i] = table.remove(self,index) 
+   else break end end
+    
 return unpack(out) end -- returns: vararg of removed values
 
-object.remove.last = function(self,number) -- removes number of entries from end of table
-    if not number or number == 1 or number == -1 then return table.remove(self,#self) 
-    elseif number == 0 then return false end local reps,out = #self + 1,{} number = abs(number) 
-    for i = 1,number do out[i] = table.remove(self,reps - i) end
-return unpack(out) end -- returns: vararg of removed values
+---- ---- ------
 
 object.remove.atIndex = function(self,index,number) -- removes number of entries at index 
     local max = #self; index = index < 1 and 1 or index > max and max or index
@@ -831,18 +923,6 @@ object.remove.atIndex = function(self,index,number) -- removes number of entries
     return unpack(out) end end -- returns: vararg of removed values
 
 ---- ---- ------
-
-object.remove.beforeIndex = function(self,index,number) -- removes entries starting before index
-    if index <= 1 then return false else max = #self; index = index > max and max or index end
-    number = number and abs(number) or math.huge local out = {} for i = 1,number do 
-        index = index - 1 if self[index] then out[i] = table.remove(self,index) else break end end
-return unpack(out) end -- returns: vararg of removed values   
-
-object.remove.afterIndex = function(self,index,number) -- removes entries starting after index
-    local max = #self; index = index <= 1 and 2 or index > max and max + 1 or index + 1 
-    number = number and abs(number) or math.huge local out = {} for i = 1,number do 
-        if self[index] then out[i] = table.remove(self,index) else break end end
-return unpack(out) end -- returns: vararg of removed values
 
 object.remove.firstIndexOf = function(self,val,...) -- removes values from their first table indexies
     local max,extra,removed = #self,select("#",...),0 if val then for i = 1,max do
