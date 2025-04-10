@@ -4,6 +4,24 @@
 if true then return end
 ----- ----- ----- ----- ----- -----
 
+testObjectToString = function()
+    
+    local toString = object.toString
+    
+    local multiArray = object{"a","b","c",{"d","e","f",{"g","h","i"}},"j","k","l","m",{"n","o","p"},"q","r","s"}
+    
+    print(multiArray)
+    
+    print(" ------- ---------- ------- ")
+    
+    print(multiArray:toString{
+        offsets = false,
+        depth = 3
+    })
+    
+end
+
+
 -- :first / :last / :range
 testObject = function()
     
