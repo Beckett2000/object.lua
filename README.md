@@ -192,7 +192,7 @@ print(tree) -- uses defaults
 
 ```lua
 
--- configure the default behavior of __tostring
+-- configure the default behavior of __tostring for object instance (tree)
 -- note: this only changes defined properties and does not overwrite the entire config table
 tree.toString:config {
  offsets = false,
