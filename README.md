@@ -210,9 +210,12 @@ Chaining: Calls which return an object can be chained
 
 ```lua
 local colors = object()
-colors:unshift("red","green"):push("blue") -> colors{"red","green","blue"}
+colors:unshift("red","green"):push("blue") 
+print(colors) --> colors{"red","green","blue"}
 ```
-
+```
+(object[3]: 0x306c9f440):{01:"red", 02:"green", 03:"blue"}
+```
 ------ ------ ------ ------
 Note 4/10/25 - The scope stack methods are being updated. The code below isn't currently working with module imports in all cases.
 ------ ------ ------ ------
