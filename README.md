@@ -94,7 +94,6 @@ object.insert.keysFromTable
 ```lua
  object.remove.indexies(self,...) --> vararg - removals
  object.remove.keys(self,...) --> vararg - removals
-
  object.remove.first(self,number) --> vararg - removals
   -- alias: object.unshift
  object.remove.last(self,number) --> vararg - removals
@@ -147,7 +146,6 @@ object.type
 object.isTypeOf
 
 object.copy
-
 ```
 
 ```
@@ -157,7 +155,7 @@ object.super | object.prototype | object.proto
 
 ```lua
  object.toString(value,options) --> string (see __tostring below)
- object.concat(sep) --> string
+ object.concat(table,sep) --> string
 ```
 
 ---------- ---------- ---------- ------
