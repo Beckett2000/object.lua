@@ -190,6 +190,20 @@ print(tree) -- uses defaults
 (object[2]: 0x306f20140):{01:"leaves", 02:"bark", alpha:(table[3]: 0x306f20bc0), kind:"oak", ["1"]:"one"}
 ```
 
+```lua
+
+-- configure the default behavior of __tostring
+-- note: this only changes defined properties and does not overwrite the entire config table
+tree.toString:config {
+ offsets = false,
+ depth = 2
+}
+
+print(tree) -- uses new configs
+```
+```
+(object[2]):{01:"leaves", 02:"bark", ["1"]:"one", kind:"oak", alpha:(table[3]):{01:"a", 02:"b", 03:"c"}}
+```
 ------ ------ ------ ------
 
 Chaining: Calls which return an object can be chained
