@@ -47,29 +47,61 @@ tree.insert:Last("dew") -> tree{"bark","branches",leaves = "green","dew"}
 
 Note: In the case of object.insert, the key of insert (on the object) is a custom object which passes its 'selfness' as the instance of the object which it is a part of. i.e in the case of object.insert.first, insert.first takes an object (self) as its first argument to the function call. This argument takes 'object' as the implicit self as opposed to insert.
 
----------------
+```
+-- syntax options -> i.e. object.insert.first
+-- note: this uses object:extend("insert") - WIP
 
-Insertions: (_.insert) custom object - Add data to object
+local myObject = object{}
+local val = "foo"
+
+-- These would all have the same effect ...
+
+---- ----- ----- ----- 
+object.insert:first(val)
+object:insertFirst(val)
+object.insert:First(val)
+object.insertfirst(val)
+---- ----- ----- ----- 
+object.insert.first(val) -- with (dotObjectRef) flag
+---- ----- ----- ----- 
+object:unshift(val) -- alias
+---- ----- ----- ----- 
 
 ```
-object.insert.first / object.unshift
-object.insert.last / object.push
-object.insert.atIndex
+------ ------ ------ ------
+
+(_.insert) extension / custom object
+
+```lua
+ object.insert.first(self,...) --> self
+ -- alias: object.unshift
+ object.insert.last(self,...) --> self
+ -- alias: object.push
+ object.insert.atIndex(self,...) --> self
+```
+
+```
 object.insert.firstIndexiesFromTable
 object.insert.lastIndexiesFromTable
 object.insert.atIndexIndexiesFromTable
 object.insert.keysFromTable
 ```
 
------- ------
+------ ------ ------ ------
 
-Removals: (_.remove) custom object - Remove data from object
+(_.remove) extension / custom object
+
+```lua
+ object.remove.indexies(self,...) --> vararg - removals
+ object.remove.keys(self,...) --> vararg - removals
+
+ object.remove.first(self,number) --> vararg - removals
+  -- alias: object.unshift
+ object.remove.last(self,number) --> vararg - removals
+  -- alias: object.pop
+```
 
 ```
-object.remove.index
-object.remove.indexies
-object.remove.first / object.shift
-object.remove.last / object.pop
 object.remove.atIndex
 object.remove.beforeIndex
 object.remove.afterIndex
@@ -81,33 +113,51 @@ object.remove.entry
 object.remove.entries
 ```
 
------- ------
+------ ------ ------ ------
 
-Utility Functions / Methods:
+(_.first / _.last) extensions / custom objects
+
+```lua
+
+ object.first(count) --> vararg - elements at first (count) indicies
+ object.last(count) --> vararg - elements at last (count) indiciez
+
+ object.first.indexOf(...) --> vararg - first indice of occurance of elements passed into method
+ object.last.indexOf(...) --> vararg - last indice of occurance of elements passed into method
 
 ```
-object.countElements
+
+------ ------ ------ ------
+utility functions / methods:
+
+```
+object.countElements | object.length
 object.contains
+
 object.indexiesOf
 object.keysOf
-object.keys
 
-object.first
-object.last
-object.firstIndexOf
-object.lastIndexOf
+object.keys
+object.hasKeys
+
+object.range
 
 object.inverseIndexies
-object.concat
 object.type
 object.isTypeOf
 
-object.meta
-object.super
-
 object.copy
-object.toString
 
+```
+
+```
+object.meta
+object.super | object.prototype | object.proto
+```
+
+```lua
+ object.toString(value,options) --> string (see __tostring below)
+ object.concat(sep) --> string
 ```
 
 ---------- ---------- ---------- ------
