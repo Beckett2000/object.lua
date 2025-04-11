@@ -416,7 +416,8 @@ _objSerialDescriptor = function(obj,opt)
         
    local status,str = pcall(tostring,self)    
    if status == false then _errorHandler{error = "pcall", method = "handleToString", message = str} end
-    natStr = status == true and concat{' [ __tostring = "',str,'"]'} or ""
+    local sep = sep == ":" and " " or ": "
+    natStr = status == true and concat{sep,'{ __tostring = "',str,'" }'} or ""
         
   else natStr = "" end
     
