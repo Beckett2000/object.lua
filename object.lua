@@ -209,6 +209,8 @@ handleToString = function(value,opt)
     
     if type(opt.offsets) == "boolean" then
      settings.offsets = opt.offsets end
+    if type(opt.lengths) == "boolean" then
+     settings.lengths = opt.lengths end
         
     settings.depth = opt.depth and type(opt.depth) == "number" and floor(abs(opt.depth)) or settings.depth
         
