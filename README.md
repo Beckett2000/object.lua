@@ -15,7 +15,7 @@ print("Hello object!")
 ```
 
 ------ ------ ------ ------
-This class has a collection of methoda and functionality which could be used to build and debug code when working in Lua. There are also certain structures which can make code structures feel like other scripting languages.
+This class has a collection of methods and functionality which could be used to build and debug code when working in Lua. There are also certain structures which can make code structures feel like other scripting languages.
 ------ ------ ------ -----
 
 Custom Object Syntax
