@@ -22,8 +22,6 @@ testPrinting = function()
     depth = 1
   }))
 
-end
-
 --[[
 
 output: 
@@ -40,6 +38,10 @@ output:
 }
 
 ]]
+
+end
+
+
 
 testPrettyPrint = function()
 
