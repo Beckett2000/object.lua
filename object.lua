@@ -162,7 +162,7 @@ local _tostringSettings = {
   offsets = true, -- show offsets 0x0000
   lengths = true, -- show lengths table[2]   
   depth = 1, -- nested table depth
- 
+    
   ----- ----- -----    
   data = {} -- used internally by the toStringHandler to keep track of states when called recursively
   ----- ----- -----
@@ -176,7 +176,7 @@ local _tostringSettings = {
 handleToString = function(value,opt)
 
    local isObject = _isObject(value)
-    
+
    local concat,unpack = 
     table.concat,table.unpack
     
@@ -241,6 +241,7 @@ handleToString = function(value,opt)
     
    local useOffsets = settings.offsets
    local depth = settings.depth
+   local override = settings.override
     
    local indents = settings.data.indents
    local nested = settings.data.nested
@@ -313,7 +314,7 @@ handleToString = function(value,opt)
     keyForm:push('[(',str,')]')    
              
    elseif formatK == "string" then
-    local varName = "^%a[%w_]*$"
+    local varName = "^[%a_][%w_]*$"
     if key:match(varName) then
      keyForm:push(key)  
     else keyForm:push('["',key,'"]') end
@@ -371,12 +372,12 @@ _objSerialDescriptor = function(obj,opt)
   ------- ------- ------- ------- ---
     
   local meta,descriptor = getmetatable(self), not isObject and tostring(self) or ""
-  local type,metaType = not isObject and type(self) or self:type(), type(meta)
+  local type,metaType = not isObject and type(self) or object.type(self), type(meta)
     
   ------- ------- ------- ------- ---
-    
+  local natStr = meta and meta.__tostring
   local sep = offsetNotation and ": " or ""
-
+    
   -- adds length str -> i.e table[2]  
   local length = showLengths and concat{"[",#self,"]"} or ""
     
@@ -391,10 +392,10 @@ _objSerialDescriptor = function(obj,opt)
    if not isObject and (metaType ~= "table" or metaType == "table" and meta.__tostring == nil) then
      offset = string.match(str,"0x%x+")  
         
-   else
-        
+   else  
+            
     ------- ------- -------
-    if meta then -- bind
+    if natStr then 
      setmetatable(self,nil) end
     ------- ------- -------
 
@@ -402,15 +403,26 @@ _objSerialDescriptor = function(obj,opt)
     offset = string.match(str,"0x%x+")
         
     ------- ------- -------
-    if meta then -- unbind
+    if natStr then 
      setmetatable(self,meta) end
     ------- ------- -------
         
   end end
         
   ------- ------- -------
-
-  descriptor = concat{type,length,sep,offset}
+  -- shows the native __tostring output for tables passed into object.toString
+    
+  if natStr and meta.__tostring ~= handleToString then
+        
+   local status,str = pcall(tostring,self)    
+   if status == false then _errorHandler{error = "pcall", method = "handleToString", message = str} end
+    natStr = status == true and concat{' [ __tostring = "',str,'"]'} or ""
+        
+  else natStr = "" end
+    
+  ------- ------- -------
+    
+  descriptor = concat{type,length,sep,offset,natStr}
     
   return descriptor --> returns: (string)
     
@@ -561,6 +573,7 @@ object._ext = {}
 
 local extMeta = { -- .ext() is a dynamic module
     
+    __type = "object._ext",
     __tostring = function(self) -- reports details when converted to string
         local names,layer,name = {},self while layer do for k,v in pairs(layer) do 
             table.insert(names,tostring(k)..":("..getmetatable(v(object)).__type..")") end 
@@ -1475,6 +1488,8 @@ object.toString = function(self,options)
     
   -- tables and functions are passed to the toStringHandler
     
+  local meta = getmetatable(self)
+  if meta and meta.__tostring and not options then return tostring(self) end
   return handleToString(self,options)
     
 end
@@ -1919,7 +1934,12 @@ _errorHandler = function(options)
     local errorType = options.error
     local types = options.types
     
-    if errorType == "missingSelf" then
+    local message = options.message
+    
+    if errorType == "pcall" then
+     return error(_stringifyTable{"pcall returned an error in ",method,': "',message,'".'})
+        
+    elseif errorType == "missingSelf" then
      return error(_stringifyTable{"argument 1 (self) to ",method," was nil."})
         
     elseif errorType == "notObject" then
@@ -2030,9 +2050,11 @@ _isObject = function(self)
     local meta = getmetatable(self)
     if not meta then return false end
     
+    --[[
     -- legacy - maybe remove this later?
     if meta.__type ~= "object" then 
      return true end
+    ]]
     
     local proto
     if meta.__index then
