@@ -4,6 +4,43 @@
 if true then return end
 ----- ----- ----- ----- ----- -----
 
+testPrinting = function()
+    
+  local myTable = {"a","b"}
+  setmetatable(myTable,{__tostring =
+   function() return "a b c d e f" end })
+    
+  local tree = object{"leaves","bark",
+  kind = "oak", [function() end] = "foo",["1"]="one",[{"a","b","c"}]= "alpha",
+  ["customTable"] = myTable, [myTable] = "custom"}
+    
+  print(object.toString(tree,{
+    style = "vertical",
+    spacer = " ", 
+    offsets = true,
+    lengths = true,
+    depth = 1
+  }))
+
+end
+
+--[[
+
+output: 
+
+(object[2]: 0x307a7a1c0):{
+  01:"leaves", 
+  02:"bark", 
+  [(table[3]: 0x307a7a6c0)]:"alpha", 
+  ["1"]:"one", 
+  kind:"oak", 
+  [(table[2]: 0x307a78b00: { __tostring = "a b c d e f" })]:"custom", 
+  [(function: 0x30a46b0a0)]:"foo", 
+  customTable:(table[2]: 0x307a78b00: { __tostring = "a b c d e f" })
+}
+
+]]
+
 testPrettyPrint = function()
 
    ------ ------ ------ ------>>
