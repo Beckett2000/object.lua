@@ -38,9 +38,9 @@ Usage example:
 
 ```lua
 local tree = object{leaves = "green")
-tree:insertFirst("branches") -> tree{"branches",leaves = "green"}
-tree.insert.first("bark") -> tree{"bark","branches",leaves = "green"}
-tree.insert:Last("dew") -> tree{"bark","branches",leaves = "green","dew"}
+tree:insertFirst("branches") --> tree{"branches",leaves = "green"}
+tree.insert.first("bark") --> tree{"bark","branches",leaves = "green"}
+tree.insert:Last("dew") --> tree{"bark","branches",leaves = "green","dew"}
 ```
 
 ------ ------ ------ ------
@@ -220,7 +220,7 @@ end
 
 ```lua
  local tree = object{"leaves","bark",
-  kind = "oak", ["1"]="one", alpha = {"a","b","c"}}
+  kind = "oak", ["1"] = "one", alpha = {"a","b","c"}}
     
  print(tree:toString{
  ---- ---- ---- ----
