@@ -92,7 +92,7 @@ object.insert.keysFromTable
 
 ------ ------ ------ ------
 
-`object.renove` - extension / custom object
+`object.remove` - extension / custom object
 
 ```lua
  object.remove.indexies(self,...) --> vararg - removals
@@ -163,8 +163,24 @@ object has a (.toString) method which can be used to handle converting lua data 
 
 ---------- ---------- ---------- ------
 
+`object.toString` - extension / custom object
+
 ```lua
  object.toString(value,options) --> string (see __tostring below)
+
+ object.toString:config { --> nill - (sets behavior for toStringHandler) -> object:meta().__tostring
+
+  offsets = true,
+  length = true,
+  depth = 1
+
+  style = "block"
+  spacer = "  "
+  
+ }
+```
+
+```lua
  object.concat(table,sep) --> string
 ```
 
