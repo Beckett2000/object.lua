@@ -462,66 +462,95 @@ local _stringifyTable = function(tab)
   return table.concat(stringTable)
 end
 
+------------ ------------ ------------
 ------------ ------------ ------------ 
 -- Object Extension Module :init() - (object:ext()) ----------- ----------- ---------
 
 local function getInheritedValue(self,prototype,key) 
     
-    --print("I was called")
-    local protoIndex = getmetatable(prototype).__index
+ --print("I was called")
+ local protoIndex = getmetatable(prototype).__index
+ local funcOrTable = isFunctionOrCallableTable
     
-    if isFunctionOrCallableTable(prototype[key]) and isCallableTable(protoIndex[key]) then
-        local objectType = object.type(protoIndex[key])
-        --print("This is self:",self)
+ if funcOrTable(prototype[key]) and isCallableTable(protoIndex[key]) then
         
-        if objectType == "ext.prefix" then
-            local wrapper = prototype._ext[key](self)
-            local wrapperMeta = getmetatable(wrapper)
+  local objectType = object.type(protoIndex[key])
+        
+  --print("This is self:",self)
+        
+  if objectType == "ext.prefix" then
             
-            wrapperMeta.__call = function(self,...) return prototype[key](...) end
-            wrapperMeta.__modifiedExt = true
-            return wrapper end
-    end
+   local wrapper = 
+    prototype._ext[key](self)
+   local wrapperMeta = getmetatable(wrapper)
+            
+    wrapperMeta.__call = function(self,...) return prototype[key](...) end
+    wrapperMeta.__modifiedExt = true
+     return wrapper end
+        
+   end
     
-    return prototype[key]     
+   return prototype[key]     
     
 end
 
+------------ ------------ ------------ 
+
 -- builder: builds object._ext
 local function initExtensionLayer(self) -- (private) initializes object extension layer
-    local meta = getmetatable(self) if meta == nil then meta = {} setmetatable(self,meta) end
-    if not meta.__exIndex then 
-        meta.__exIndex = {} setmetatable(meta.__exIndex,{__type = "extLayer"})
-    elseif meta.__exIndex == true then local exIndexMeta = {} -- makes new layer referencing superclass 
-        for k,v in pairs(getmetatable(meta.__proto)) do exIndexMeta[k] = v end 
-        meta.__exIndex = {} setmetatable(meta.__exIndex,exIndexMeta) end
-    local exIndex,super = meta.__exIndex,{} setmetatable(super,{__index = meta.__index});  
     
-    getmetatable(exIndex).__index = function(exIndex,key) -- (lazy unpack) instantiates extensions
+  local meta = getmetatable(self)
+    
+  if meta == nil then meta = {} setmetatable(self,meta) end
+    
+  if not meta.__exIndex then 
+   meta.__exIndex = {}
+   setmetatable(meta.__exIndex,
+    {__type = "extLayer"})
         
-        local protoIndex = getmetatable(meta.__proto).__index
-        local keyIsModified = protoIndex and protoIndex[key] and isCallableTable(protoIndex[key]) and getmetatable(protoIndex[key]).__modifiedExt == true
+  elseif meta.__exIndex == true then
+        
+   local exMeta = {} -- makes new layer referencing superclass 
+   local protoMeta = getmetatable(meta.__proto)
+        
+   for k,v in pairs(protoMeta) do 
+    exMeta[k] = v end 
+   meta.__exIndex = {}
+   setmetatable(meta.__exIndex,exMeta)
     
-        if (protoIndex and protoIndex[key] ~= super[key]) or keyIsModified then 
-          exIndex[key] = getInheritedValue(self,meta.__proto,key) return exIndex[key]
-        elseif super._ext and super._ext[key] then exIndex[key] = super._ext[key](self) return exIndex[key] end
+  end
+    
+  local exIndex,super = meta.__exIndex,{} setmetatable(super,{__index = meta.__index});  
+    
+   getmetatable(exIndex).__index = function(exIndex,key) -- (lazy unpack) instantiates extensions
+        
+     local protoIndex = getmetatable(meta.__proto).__index
+     local keyIsModified = protoIndex and protoIndex[key] and isCallableTable(protoIndex[key]) and getmetatable(protoIndex[key]).__modifiedExt == true
+    
+     if (protoIndex and protoIndex[key] ~= super[key]) or keyIsModified then 
+       exIndex[key] = getInheritedValue(self,meta.__proto,key) return exIndex[key]
+      elseif super._ext and super._ext[key] then exIndex[key] = super._ext[key](self) return exIndex[key] end
         return super[key] end 
     
     -- sets a constructor instance for objects
     exIndex.constructor = super.new
-    
     meta.__index = exIndex 
     
 return meta.__exIndex end -- returns: extension layer
 
+------------ ------------ ------------ 
+
 local function hasExtensionLayer(self) -- (private) determines if table has ext layer
-    local meta = getmetatable(self) if meta and meta.__exIndex then return true, meta.__exIndex 
-    else return false end end -- returns: true and extension layer if found or false otherwise
+ local meta = getmetatable(self)
+ if meta and meta.__exIndex then
+  return true, meta.__exIndex 
+ else return false end
+ end -- returns: true and extension layer if found or false otherwise
 
 local function getExtensionIndex(self)
-    local hasIndex,exIndex = hasExtensionLayer(self)
-    if not hasIndex then exIndex = initExtensionLayer(self) end
-    return exIndex 
+  local hasIndex,exIndex = hasExtensionLayer(self)
+  if not hasIndex then exIndex = initExtensionLayer(self) end
+  return exIndex 
 end
 
 ------------ ------------ ------------ 
@@ -535,191 +564,221 @@ end
 ------------ ------------ ------------
 
 local function getExtStore(self) -- (private) points to / creates object.ext store
+    -- print("This is self:",self)
+ local target,ext 
+ if self ~= object then -- stores extensions in __exIndex of metatable
+        
+  local layer = getExtensionIndex(self)
+  local meta = getmetatable(self)  
+        
+  target,ext = layer, meta.__proto and meta.__proto._ext or nil
+        
+ else -- stores extensions in self 
+  target,ext = self,self._ext 
+ end 
     
-    local target,ext 
-    if self ~= object then -- stores extensions in __exIndex of metatable
+ if not rawget(target,"_ext") then -- creates .ext index if not present
         
-        local layer,meta = getExtensionIndex(self),getmetatable(self)  
-        target,ext = layer, meta.__proto and meta.__proto._ext or nil
+  meta = {} target._ext = {} 
+  local cache = ext or object._ext 
+  for k,v in pairs(getmetatable(cache)) do meta[k] = v end 
         
-    else target,ext = self,self._ext end -- stores extensions in self 
-    if not rawget(target,"_ext") then -- creates .ext index if not present
-        meta = {} target._ext = {} local cache = ext or object._ext 
-        for k,v in pairs(getmetatable(cache)) do meta[k] = v end meta.__index,meta.__proto = ext,ext;   
-    setmetatable(target._ext,meta) end return target._ext end
+  meta.__index,meta.__proto = ext,ext;   
+  setmetatable(target._ext,meta) end 
+    
+return target._ext end
 
 ------------ ------------ ------------
 
 local function _extSetter(ext,wrapper) -- (private) creates setters ext().setter(val).key
     
-    return function(self,name,method) -- (static) creates wrapper for calls
+ return function(self,name,method) -- (static) creates wrapper for calls
         
-        local store = self ~= ext and getExtStore(self)(self) or self 
-        if not name and not method then -- determines _:ext:prefix() method output
+  local store = self ~= ext and getExtStore(self)(self) or self 
+        
+  if not name and not method then -- determines _:ext:prefix() method output
             
-            local caller = {} setmetatable(caller,{ -- creates _:ext:wrapper() calling object
+   local caller = {}
+   setmetatable(caller,{ -- creates _:ext:wrapper() calling object
                 
-                __newindex = function(alias,key,value) store[key] = wrapper(key,value) end,
+   __newindex = function(alias,key,value)
+    store[key] = wrapper(key,value) end,
+   __call = function(...) return 
+    wrapper(name,method)(store)(...) end 
                 
-                __call = function(...) return wrapper(name,method)(store)(...) end }) return caller
+  }) return caller
             
-        else store[tostring(name)] = wrapper(name,method or function() end) end end end
+  else store[tostring(name)] = wrapper(name,method or function() end) 
+  end     
+             
+end end 
 
-local function getBackReference(self) -- (private) gets target table of alias layers
-    local target,meta = self while target do meta = getmetatable(target) 
-        if meta and meta.__self then target = meta.__self -- iterates through aliases
-        else return target end end end -- returns: alias root target
+------------ ------------ ------------
 
------------- ------------ ------------ 
+-- (private) get alias function store
+local function getBackReference(self) 
+    
+ local target,meta = self 
+ while target do -- iterate through aliases
+  meta = getmetatable(target) 
+  if meta and meta.__self then
+   target = meta.__self 
+  else return target end end
+        
+end  -- returns: alias root target
+
+------------> ------------> ------------> 
 object._ext = {} 
------------- ------------ ------------ 
+------------> ------------> ------------> 
 
 local extMeta = { -- .ext() is a dynamic module
     
-    __type = "object._ext",
-    __tostring = function(self) -- reports details when converted to string
-        local names,layer,name = {},self while layer do for k,v in pairs(layer) do 
-            table.insert(names,tostring(k)..":("..getmetatable(v(object)).__type..")") end 
-        layer = getmetatable(layer).__proto end table.sort(names)
-    return "(ext cache):{"..table.concat(names,", ").."}" end,
+ __type = "object._ext",
     
-    __index = function(ext,key) return ext(getBackReference(ext))[key] end, -- object.ext:method()
+ __tostring = function(self) -- reports details when converted to string
+  local names,layer,name = {},self 
+  while layer do for k,v in pairs(layer) do 
+   table.insert(names,tostring(k)..":("..getmetatable(v(object)).__type..")") end 
+   layer = getmetatable(layer).__proto end table.sort(names)
+  return "(ext cache):{"..table.concat(names,", ").."}" end,
     
-    __call = function(ext,obj)  -- invoked when calling object:ext()
-        if not obj then error("invalid arg. no.1 (lua table) to object.ext().",2) return end 
+  __index = function(ext,key) return ext(getBackReference(ext))[key] end, -- object.ext:method()
+    
+  ------------- -------------
+    
+  __call = function(ext,obj)  -- invoked when calling object:ext()
+   if not obj then error("invalid arg. no.1 (lua table) to object.ext().",2) 
+   return end 
         
-        local extender,meta = {},{ -- extender -> returned by object:ext()   
+   local extender,meta = {},{ -- extender -> returned by object:ext()   
             
-            __newindex = function(self,key,value) -- [newindex] object.ext[key] set / object[key] unwrapped
-                local store = getExtStore(obj) store[key],obj[key] = value, value(obj) end,
+    __newindex = function(self,key,value) -- [newindex] object.ext[key] set / object[key] unwrapped
+     local store = getExtStore(obj) store[key],obj[key] = value, value(obj) end,
             
-            __index = function(extension,key) 
+    __index = function(extension,key) 
                 
-                local ext = {} -- handles indexes to _:ext()        
+     local ext = {} -- handles indexes to _:ext()        
                 
-                ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
-                -- [ext().prefix()] - Declare: :ext():|prefix|().name = method / :ext():|prefix|(name,method)
-                -- Declare Key: :|prefix|().|key| = method / .|prefix||key| = method
-                -- Call Key: object:prefix():key() / object.prefix:key() / object:|prefix||key|()     
-                ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+      ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+      -- [ext().prefix()] - Declare: :ext():|prefix|().name = method / :ext():|prefix|(name,method)
+      -- Declare Key: :|prefix|().|key| = method / .|prefix||key| = method
+      -- Call Key: object:prefix():key() / object.prefix:key() / object:|prefix||key|()     
+      ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
                 
-                ext._prefix = _extSetter(extension, function(name,method) -- (passUp) object indexer / sorter
-                 return function(self)  
+      ext._prefix = _extSetter(extension, function(name,method) -- (passUp) object indexer / sorter
+        return function(self)  
                         
-                  local extension,meta = {_isPrefix = true},
-                    { __type = "ext.prefix", __self = obj,
-                            __tostring = function(pointer) -- (ext) returns prefix descriptor string
-                                local level,list,entry,key,val = self,{} while level do key,val = next(level)
-                                    while val do if string.find(key,"^"..name) then entry = string.gsub(key,"^"..name,"") 
-                                            if entry ~= "" then for i = 1,#list do if list[i] == entry then entry = "" break end end end
-                                            list[#list + 1] = entry ~= "" and entry or nil end key,val = next(level,key) end       
-                                level = getmetatable(level) level = level and level.__proto end table.sort(list)
-                            return "(ext.prefix _:"..name.."|...|):{"..table.concat(list,", ").."}" end,      
+         local extension,meta = {_isPrefix = true},{ 
                             
-                            __newindex = function(pointer,key,value) -- declaration: obj.|prefix|.|name| = method        
+          __type = "ext.prefix", 
+          __self = obj,
                             
-                                -- _caseStr: converts first char of string to lowercase or uppercase 
+          -- (ext) returns prefix descriptor string        
+          __tostring = function(pointer) 
+           local level,list,entry,key,val = self,{} while level do key,val = next(level)
+             while val do if string.find(key,"^"..name) then entry = string.gsub(key,"^"..name,"") 
+                if entry ~= "" then for i = 1,#list do if list[i] == entry then entry = "" break end end end
+                list[#list + 1] = entry ~= "" and entry or nil end key,val = next(level,key) end       
+             level = getmetatable(level) level = level and level.__proto end table.sort(list)
+         return "(ext.prefix _:"..name.."|...|):{"..table.concat(list,", ").."}" end,        
+                                                   
+         -- declaration: obj.|prefix|.|name| = method                        
+         __newindex = function(pointer,key,value) 
+                             
+           -- _caseStr: converts first char of string to lowercase or uppercase 
                                 
-                                local _caseStr = function(str,upper)
-                                 local format = function(a,b) 
-                                  local upperOrLower = upper and string.upper or string.lower
-                                    return upperOrLower(a)..b end
-                                    return string.gsub(str,"(%a)(%a+)",format) 
-                                end
+           local _caseStr = function(str,upper)
+             local format = function(a,b) 
+             local upperOrLower = upper and string.upper or string.lower
+              return upperOrLower(a)..b end
+             return string.gsub(str,"(%a)(%a+)",format) end
                                 
-                                local entry,internal = tostring(key) 
-                                local names = {_caseStr(entry,true),_caseStr(entry,false)}
+           local entry,internal = tostring(key) 
+           local names = {_caseStr(entry,true),_caseStr(entry,false)}
                                 
-                                for i = 1,2 do
-                                  local entry = name..names[i]
-                                  if not value and not rawget(self,entry) then
-                                  internal = false error("Extension cannot modify superclass.",2) else internal = true end
-                                  self[entry] = (not value and internal) and nil or value
-                                end
+          for i = 1,2 do
+           local entry = name..names[i]
+           if not value and not rawget(self,entry) then
+            internal = false error("Extension cannot modify superclass.",2) else internal = true end
+            self[entry] = (not value and internal) and nil or value
+           end                
+          end,
                             
-                            end,
+         ---- ---- ---- ---- ---- ----
                             
-                            ---- ---- ---- ---- ---- ----
-                            
-                            __index = function(pointer,key) -- indexing statement: _.|prefix|:|name|()
+         __index = function(pointer,key) -- indexing statement: _.|prefix|:|name|()
                                 
-                                local key = name..tostring(key)
-                                local path = self[key] local format = type(path)
+          local key = name..tostring(key)
+          local path = self[key] local format = type(path)
                                 
-                                if format == "function" then return function(v,...) -- redirector function for calls
+          if format == "function" then return function(v,...) -- redirector function for calls
                                 
-                                 --[[
-                                 if true and path then return function(...) 
-                                  return path(...) end end
-                                 ]] --end
+            --[[
+            if true and path then return function(...) 
+              return path(...) end end
+            ]] --end
                                         
-                                 --- --- -----
+            --- --- -----
     
-                                 if v == pointer then return path(self,...)
+            if v == pointer then return path(self,...)
                                             
-                                 -- elseif pointer._isPrefix == true then print("ok") return pointer
+            -- elseif pointer._isPrefix == true then print("ok") return pointer
                                             
-                                 elseif self == object then return object[key](v,...)          
-                                 end
-                                        
-                                 ---- ------ ---- ------ ---- ------
-                                 -- overload: objectInst.[ext].[val] points to objectInst i.e. tree.insert.first("apple") -> tree{"apple"}
-                                        
-                                 if _objectConfig.dotObjectRef == true then
-                                  return path(self,v,...)       
-                                 end
-
-                                 ---- ------ ---- ------ ---- ------
-                                    
-                                end 
-                            
-                                elseif key ~= "__self" then 
-                                 -- print("fell through to __self ...")
-                                 return path end  
-                                
-                                return path
-                            
-                            end, -- returns: redirector or key actual 
-                            
-                            ---- ---- ---- ---- ---- ----
-                            
-                            __call = function(pointer,obj,...) -- calling statement: _:|prefix|() / _:|prefix|():|name|()          
-                                     
-                                if not obj then return end local extra = select("#",...)
-                                local meta = obj and getmetatable(pointer)
-                                local objType = type(obj)
-                                
-                                ------ ------ ------
-                                --- WIP - use this to alow _ext():_prefix() methods to not return the prefix itself when called with no arguments 
-                                
-                                if _objectConfig.callChain == true then
-                                
-                                 if obj == pointer and extra == 0 then 
-                                  return pointer 
-                                    
-                                 elseif extra == 0 and objType == "table" then 
-                                  -- print("Handling _ext store for calling ...")
-                                 return obj[name] and obj[name] or
-                                  getBackReference(pointer)[name]  
-                                        
-                                end
-                                ------ ------ ------
-                                                      
-                                else return method(obj,...) end end 
-                            
-                            ---- ---- ---- ---- ---- ----
-                            
-                        } setmetatable(extension,meta) return extension end end ) 
-                
-                return ext[key]  
-                
+            elseif self == object then return object[key](v,...)          
             end
+                                        
+            ---- ------ ---- ------ ---- ------
+                                        
+            -- overload: objectInst.[ext].[val] points to objectInst i.e. tree.insert.first("apple") -> tree{"apple"}
+                                        
+            if _objectConfig.dotObjectRef == true then
+             return path(self,v,...)       
+            end
+
+            ---- ------ ---- ------ ---- ------                       
+           end 
+                            
+         elseif key ~= "__self" then 
+          -- print("fell through to __self ...")
+          return path end  
+                                
+        return path end, -- returns: redirector or key actual 
+                            
+        ---- ---- ---- ---- ---- ----
+                            
+        __call = function(pointer,obj,...) -- calling statement: _:|prefix|() / _:|prefix|():|name|()          
+                                     
+         if not obj then return end local extra = select("#",...)
+         local meta = obj and getmetatable(pointer)
+         local objType = type(obj)
+                                
+         ------ ------ ------
+         --- WIP - use this to alow _ext():_prefix() methods to not return the prefix itself when called with no arguments 
+                                
+         if _objectConfig.callChain == true then
+                                
+          if obj == pointer and extra == 0 then return pointer                
+          elseif extra == 0 and objType == "table" then 
+                                 
+            -- print("Handling _ext store for calling ...")
+           return obj[name] and obj[name] or getBackReference(pointer)[name]  
+                                        
+          end
+                                   
+         else ------ ------ ------
+          return method(obj,...) end end 
+                            
+         ---- ---- ---- ---- ---- ----
+                            
+         } setmetatable(extension,meta) return extension end end ) 
+                
+       return ext[key] end
             
-        } -- returns: pointer to method in entry
+     } -- returns: pointer to method in entry
         
-        setmetatable(extender,meta) 
+    setmetatable(extender,meta) 
         
-    return extender end }
+ return extender end }
 
 -- Sets up metatable for object.ext
 setmetatable(object._ext,extMeta)
@@ -764,7 +823,7 @@ object.extend = function(self,key)
   return end
  if self[key] and 
   isFunctionOrCallableTable(self[key]) then 
-   object:_ext():_prefix()[key] = self[key]
+   self:_ext():_prefix()[key] = self[key]
   end end
 
 -------------------- -------------------- --------------------     
