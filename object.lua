@@ -2108,7 +2108,7 @@ _firstOrLast = function(self,dir,cnt)
                 table.insert(out,self[i]) end
             
         end return unpack(out)
-    end end -- returns: vararilpg of entries    
+    end end -- returns: vararg of entries    
 
 -------- ------ >>
 -- helper: finds indexOf table elements  
