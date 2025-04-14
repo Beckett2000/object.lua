@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.08 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-10-25)
+-- object.lua - 3.08 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-14-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -95,11 +95,18 @@ local _implicitSelfObj = nil
 
 ------------ ------------ ------------ 
 -- Private method declarations
-
 ------------ ------------ ------------ 
 local _isObject, _firstOrLast, _indexOf
 local handleToString, _objSerialDescriptor 
 local _errorHandler, _canFunctionRun
+------------ ------------ ------------ 
+
+------------ ------------ ------------ 
+-- Debug Logs for object class
+------------ ------------ ------------ 
+local objectDebug = {
+  extensions = false
+}
 ------------ ------------ ------------ 
 
 local meta = {__index = self, __type = "object class", __version = true,
@@ -466,31 +473,40 @@ end
 ------------ ------------ ------------ 
 -- Object Extension Module :init() - (object:ext()) ----------- ----------- ---------
 
-local function getInheritedValue(self,prototype,key) 
+local function getInheritedValue(self,proto,key) 
     
- --print("I was called")
- local protoIndex = getmetatable(prototype).__index
+ --print("getInheritedValue was called:",self,prototype:toString())
+
+ local protoIndex = getmetatable(proto).__index
  local funcOrTable = isFunctionOrCallableTable
     
- if funcOrTable(prototype[key]) and isCallableTable(protoIndex[key]) then
-        
-  local objectType = object.type(protoIndex[key])
+ -- wrapper creation from ext in proto of object (self) -> returned wrapper is stored in self:meta():__exIndex
+    
+ if funcOrTable(proto[key]) then
+    
+  local objectType = object.type(proto[key])
         
   --print("This is self:",self)
         
   if objectType == "ext.prefix" then
             
    local wrapper = 
-    prototype._ext[key](self)
+    proto._ext[key](self)
+            
+    if objectDebug.extensions then
+    print(object.concat{"getInheritedValue(): '",objectType,"' wrapper created from extension: [",proto[key],"] with key: '", key,"' for object: [",self,"]."}) end
+
    local wrapperMeta = getmetatable(wrapper)
             
-    wrapperMeta.__call = function(self,...) return prototype[key](...) end
+    wrapperMeta.__call = function(self,...) return proto[key](...) end
+            
     wrapperMeta.__modifiedExt = true
-     return wrapper end
+    return wrapper end
         
    end
     
-   return prototype[key]     
+   -- fallthrough in case wrapper fails
+   return proto[key]     
     
 end
 
@@ -527,8 +543,17 @@ local function initExtensionLayer(self) -- (private) initializes object extensio
      local protoIndex = getmetatable(meta.__proto).__index
      local keyIsModified = protoIndex and protoIndex[key] and isCallableTable(protoIndex[key]) and getmetatable(protoIndex[key]).__modifiedExt == true
     
+     -- print("This is where the proto index is being used ...")
+        
      if (protoIndex and protoIndex[key] ~= super[key]) or keyIsModified then 
-       exIndex[key] = getInheritedValue(self,meta.__proto,key) return exIndex[key]
+            
+       exIndex[key] = getInheritedValue(self,meta.__proto,key) 
+     
+       if objectDebug.extensions then
+        print(object.concat{"{{ lazy load }} Loaded extension from proto: [", meta.__proto,"] with key: '",key, "' for object: [",self,"]. New __exIndex: [",object.tostring(meta.__exIndex),"]."}) end
+            
+      return exIndex[key]
+            
       elseif super._ext and super._ext[key] then exIndex[key] = super._ext[key](self) return exIndex[key] end
         return super[key] end 
     
@@ -792,25 +817,33 @@ setmetatable(object._ext,extMeta)
 
 object.new = function(super,self) -- (object) - base constructor 
     
-    local meta,superMeta = {__type = "object", __data = false}, getmetatable(super) meta.__index = super == object and superMeta.__proto or super
+ local meta,superMeta = {__type = "object", __data = false}, getmetatable(super) meta.__index = super == object and superMeta.__proto or super
+
+  -- Note (3-9-25): meta.__proto used to be set to meta.__index. This was changed to meta.__index = super. This may have unexpected effects in classes which use object (see below)
     
-    -- Note (3-9-25): meta.__proto used to be set to meta.__index. This was changed to meta.__index = super. This may have unexpected effects in classes which use object (see below)
+  meta.__proto = meta.__index
+  meta.__exIndex = 
+   superMeta.__exIndex and true 
+        
+  for k,v in pairs(superMeta) do 
+   if meta[k] == nil then 
+    meta[k] = type(v) ~= "table" and v or object.copy(v) end 
+  end
+     
+  meta.__type = super == _object and "object" or meta.__type 
+  self = type(self) == "table" and 
+   self or {}
     
-    meta.__proto,meta.__exIndex = meta.__index,superMeta.__exIndex and true for k,v in pairs(superMeta) do 
-        if not meta[k] then meta[k] = type(v) ~= "table" and v or object.copy(v) end end
-    meta.__type = super == _object and "object" or meta.__type 
-    self = type(self) == "table" and self or {}
+  -- object.constructor = super.new
     
-    -- object.constructor = super.new
+  -- Iterates over passed in table and moves metamethods to metatable
+ for key,value in pairs(self) do
+   if meta_tables[key] or meta_ext[key] then
+    meta[key], self[key] = value, nil
+ end end
     
-    -- Iterates over passed in table and moves metamethods to metatable
-    for key,value in pairs(self) do
-        if meta_tables[key] or meta_ext[key] then
-            meta[key], self[key] = value, nil
-        end
-    end
-    
-    setmetatable(self,meta) initExtensionLayer(self) -- creates and initializes object meta
+ setmetatable(self,meta)
+ initExtensionLayer(self) -- creates and initializes object meta
     
 return self end -- returns: new object instance
 
@@ -1308,8 +1341,12 @@ object.hasKeys = function(self,...)
  if not self or type(self) ~= "table" then return false end
  for i = 1, select("#",...) do
   if not self[select(i,...)] then return false end
-  end return true end
-
+ end return true end
+        
+object.indexies = function(self)
+    return unpack(self,1,#self)
+end
+        
 -------- -------- -------- -------- 
 -- object.first|...| -- Prefix 
 -------- -------- -------- -------- 
@@ -1375,10 +1412,24 @@ end
 -------- -------- -------- --------
 
 object.copy = function(self) -- Creates a deep copy of object table and metatable
-    local meta,metaFm,copy = {}, getmetatable(self) or {},{} for k,v in pairs(metaFm) do meta[k] = v end
-    for key,value in pairs(self) do if type(value) ~= "table" then copy[key] = value
-        else copy[key] = object.copy(value) end end setmetatable(copy,meta) 
+    
+    if type(self) ~= "table" then
+     -- error("object.copy: self was not table. ",self)
+     return self
+    end
+
+    local meta,metaFm,copy = {}, getmetatable(self) or {},{} 
+    
+    for k,v in pairs(metaFm) do 
+     meta[k] = v end
+    
+    for key,value in pairs(self) do 
+     if type(value) ~= "table" then copy[key] = value
+     else copy[key] = object.copy(value)
+    end end setmetatable(copy,meta) 
+    
     return copy 
+    
 end -- returns: object - copy of object
 
 -------- -------- -------- -------- 
@@ -1593,11 +1644,8 @@ object.toString.config = function(self,opt)
 end
 
 ---------- -------- ----------
-
--- Note: This could only work outside of an object scope -- WIP
-
--- object.tostring = object.toString
-
+-- Note: This does not currently work inside an object scope -- WIP
+object.tostring = object.toString
 ---------- -------- ----------
 
 ----- ------ ------- -------- --------
@@ -2060,7 +2108,7 @@ _firstOrLast = function(self,dir,cnt)
                 table.insert(out,self[i]) end
             
         end return unpack(out)
-    end end -- returns: vararg of entries    
+    end end -- returns: vararilpg of entries    
 
 -------- ------ >>
 -- helper: finds indexOf table elements  
