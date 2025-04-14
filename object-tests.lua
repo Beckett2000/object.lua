@@ -4,6 +4,55 @@
 if true then return end
 ----- ----- ----- ----- ----- -----
 
+testExtend = function()
+    
+    local plant = object{"a","b","c"}
+
+    print(plant)
+    
+    plant.grow = function(self)
+     self:insertLast(self:indexies())
+     print("The plant grew:",self)
+     return self -- chaining
+    end
+    
+    plant:grow()
+    
+    plant:extend("grow")
+    
+    plant.grow.leaves = function(self)
+     self:unshift("leaves"):push("leaves")
+     print("Now there are leaves:",self)
+    end
+    
+    plant.grow:Leaves()
+    
+    local clover = plant{"sprout"}
+    print("This is the clover:",clover)
+    
+    clover:grow():grow()
+    
+    clover.grow:leaves()
+    
+    print("End test ext.prefix: plant: [",plant,"], clover: [",clover,"].")
+
+    --[[ expected output:
+
+      (object[3]: 0x311f94a80):{01:"a", 02:"b", 03:"c"}
+      The plant grew:	(object[6]: 0x311f94a80):{01:"a", 02:"b", 03:"c", 04:"a", 05:"b", 06:"c", grow:(function: 0x3048c9cb0)}
+      Now there are leaves:	(object[8]: 0x311f94a80):{01:"leaves", 02:"a", 03:"b", 04:"c", 05:"a", 06:"b", 07:"c", 08:"leaves", growleaves:(function: 0x3048d1ad0), growLeaves:(function: 0x3048d1ad0), grow:(ext.prefix[0]: 0x311f7be80: { __tostring = "(ext.prefix _:grow|...|):{Leaves, leaves}" })}
+      This is the clover:	(object[1]: 0x311f3bd40):{01:"sprout"}
+      The plant grew:	(object[2]: 0x311f3bd40):{01:"sprout", 02:"sprout"}
+      The plant grew:	(object[4]: 0x311f3bd40):{01:"sprout", 02:"sprout", 03:"sprout", 04:"sprout"}
+      Now there are leaves:	(object[6]: 0x311f3bd40):{01:"leaves", 02:"sprout", 03:"sprout", 04:"sprout", 05:"sprout", 06:"leaves"}
+      End test ext.prefix: plant: [	(object[8]: 0x311f94a80):{01:"leaves", 02:"a", 03:"b", 04:"c", 05:"a", 06:"b", 07:"c", 08:"leaves", growleaves:(function: 0x3048d1ad0), growLeaves:(function: 0x3048d1ad0), grow:(ext.prefix[0]: 0x311f7be80: { __tostring = "(ext.prefix _:grow|...|):{Leaves, leaves}" })}	], clover: [	(object[6]: 0x311f3bd40):{01:"leaves", 02:"sprout", 03:"sprout", 04:"sprout", 05:"sprout", 06:"leaves"}	].
+
+    --]]
+    
+end
+
+
+
 testPrinting = function()
     
   local myTable = {"a","b"}
