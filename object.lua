@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.08 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-14-25)
+-- object.lua - 3.10 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-15-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -17,13 +17,15 @@
 
 -- Local variable declaration for speed improvements
 
-local type,pairs,table,unpack,setmetatable,getmetatable,getfenv,setfenv,object = 
-type,pairs,table,table.unpack,setmetatable,getmetatable,getfenv,setfenv,object
+local type,pairs,table,unpack,concat,setmetatable,getmetatable,gsub,getfenv,setfenv = 
+type,pairs,table,table.unpack,table.concat,setmetatable,getmetatable,string.gsub,getfenv,setfenv
+
 local abs,pi,cos,min,max,pow,acos,floor,sqrt = math.abs,math.pi,math.cos,
 math.min,math.max, math.pow,math.acos,math.floor,math.sqrt
 
 ----- ----- ----- ----- ----- -----
 
+local object = object
 if not object then   
   object = {libs = {}, stack = {}}    
 end
@@ -96,10 +98,11 @@ local _implicitSelfObj = nil
 ------------ ------------ ------------ 
 -- Private method declarations
 ------------ ------------ ------------ 
-local _isObject, _firstOrLast, _indexOf
 local handleToString, _objSerialDescriptor 
 local _errorHandler, _canFunctionRun
 ------------ ------------ ------------ 
+local _isObject, _firstOrLast, _indexOf
+------------ ------------ ------------
 
 ------------ ------------ ------------ 
 -- Debug Logs for object class
@@ -162,6 +165,10 @@ local _tostringSettings = {
     
   style =  "inline", -- "vertical",
   spacer = " ", -- indent space i.e. "\t"
+ 
+  -- maybe add these options later?   
+  -- layout:
+  -- padding:
     
   ----- ----- ----- ----- ----- -----
   -- table / function info options
@@ -260,16 +267,43 @@ handleToString = function(value,opt)
    local descriptor = type(self)
    if descriptor == "table" then descriptor = objStr(self,settings) end
     
-   if depth == 0 then
-    return concat{"(",descriptor,")"}
-   end
-
    ---- --- ---- --- ---- --- ----
    -- (depth) data value stringification
    -- adds string data for leveles of nested tables. Defalts to level 1
+    
+   if depth == 0 then
+    return concat{"(",descriptor,")"}
+   end
+    
+   ---- --- ---- --- ---- --- ----
+   -- (sort) - sort the list of indexies / keys for the tosteing display
+  
+   local list = {string = {}, number = {}, table = {}, ["function"] = {}}
    
-   for key,val in pairs(self) do 
+   local valueType
+   for key,val in pairs(self) do
+    if val then 
+     table.insert(list[type(key)],key)
+   end end
+    
+   table.sort(list.string)
+   table.sort(list.number)
+
+   local sortList
+   sortList = function(key)
+    for i = 1, #list[key] do
+     table.insert(list,list[key][i])     
+    end list[key] = nil
+    return sortList
+   end
+   
+   sortList("number")("string")("table")("function") --> list: index/key order
+    
+   ---- --- ---- --- ---- --- ----
+    
+   for i = 1,#list do 
         
+    local key,val = list[i],self[list[i]]
     formatK,formatV = type(key),type(val)  
     key,notation = formatK == "number" and key < 10 and "0"..key or key
         
@@ -374,6 +408,8 @@ _objSerialDescriptor = function(obj,opt)
   local self = obj
   local meta,descriptor
   local isObject = _isObject(self)
+
+  local opt = opt and opt or _tostringSettings
     
   ------- ------- ------- ------- ---
   local offsetNotation = opt.offsets
@@ -423,7 +459,8 @@ _objSerialDescriptor = function(obj,opt)
     
   if natStr and meta.__tostring ~= handleToString then
         
-   local status,str = pcall(tostring,self)    
+   local status,str = pcall(tostring,self)  
+          
    if status == false then _errorHandler{error = "pcall", method = "handleToString", message = str} end
     local sep = sep == ":" and " " or ": "
     natStr = status == true and concat{sep,'{ __tostring = "',str,'" }'} or ""
@@ -469,6 +506,18 @@ local _stringifyTable = function(tab)
   return table.concat(stringTable)
 end
 
+-------- ------ >>
+-- converts a string to upper or lower case
+
+local _upperOrLower = function(str,upper)
+ if type(str) ~= "string" then
+  return str end
+ local form = function(a,b) 
+ local upperOrLower = upper and string.upper or string.lower
+  return upperOrLower(a)..b end
+ local out = gsub(str,"(%a)(%a+)",form)
+ return out end
+
 ------------ ------------ ------------
 ------------ ------------ ------------ 
 -- Object Extension Module :init() - (object:ext()) ----------- ----------- ---------
@@ -478,15 +527,17 @@ local function getInheritedValue(self,proto,key)
  --print("getInheritedValue was called:",self,prototype:toString())
 
  local protoIndex = getmetatable(proto).__index
- local funcOrTable = isFunctionOrCallableTable
+ local callable = isFunctionOrCallableTable
     
  -- wrapper creation from ext in proto of object (self) -> returned wrapper is stored in self:meta():__exIndex
     
- if funcOrTable(proto[key]) then
+ if callable(proto[key]) then
     
   local objectType = object.type(proto[key])
         
   --print("This is self:",self)
+        
+  if objectType == "ext.extend" then return end -- you should never get an extend obj here ...
         
   if objectType == "ext.prefix" then
             
@@ -540,17 +591,34 @@ local function initExtensionLayer(self) -- (private) initializes object extensio
     
    getmetatable(exIndex).__index = function(exIndex,key) -- (lazy unpack) instantiates extensions
         
-     local protoIndex = getmetatable(meta.__proto).__index
+     local backRef = (meta.__type ~= "ext.prefix") and meta.__proto or meta.__self
+             
+     backRef = meta.__proto   
+        
+    if false then
+    if objectDebug.extensions == true then  print(table.concat{"initExtensionLayer(): for object type: [",meta.__type,"]."}) end end
+        
+      -- meta.__type == "ext.prefix",meta.__type)
+        
+     --[[
+     print("This is the metadata here..")
+     for k,v in pairs(self) do
+       print(table.concat{"Meta k:",k," Value:",v})
+     end
+     ]]
+        
+     local protoIndex = getmetatable(backRef).__index
+        
      local keyIsModified = protoIndex and protoIndex[key] and isCallableTable(protoIndex[key]) and getmetatable(protoIndex[key]).__modifiedExt == true
     
      -- print("This is where the proto index is being used ...")
         
      if (protoIndex and protoIndex[key] ~= super[key]) or keyIsModified then 
             
-       exIndex[key] = getInheritedValue(self,meta.__proto,key) 
+       exIndex[key] = getInheritedValue(self,backRef,key) 
      
        if objectDebug.extensions then
-        print(object.concat{"{{ lazy load }} Loaded extension from proto: [", meta.__proto,"] with key: '",key, "' for object: [",self,"]. New __exIndex: [",object.tostring(meta.__exIndex),"]."}) end
+        print(object.concat{"{{ lazy load }} Loaded extension .. \nfrom proto: [[ ", meta.__proto,' ]]\n with key: "',key, '"\n for object: [[ ',self," ]].\n new meta.__exIndex: [",object.tostring(meta.__exIndex),"]."}) end
             
       return exIndex[key]
             
@@ -574,7 +642,7 @@ local function hasExtensionLayer(self) -- (private) determines if table has ext 
 
 local function getExtensionIndex(self)
   local hasIndex,exIndex = hasExtensionLayer(self)
-  if not hasIndex then exIndex = initExtensionLayer(self) end
+  if not hasIndex then exIndex = initExtensionayer(self) end
   return exIndex 
 end
 
@@ -635,7 +703,7 @@ local function _extSetter(ext,wrapper) -- (private) creates setters ext().setter
             
   else store[tostring(name)] = wrapper(name,method or function() end) 
   end     
-             
+     
 end end 
 
 ------------ ------------ ------------
@@ -653,7 +721,7 @@ local function getBackReference(self)
 end  -- returns: alias root target
 
 ------------> ------------> ------------> 
-object._ext = {} 
+object._ext = {} ---> ------> -------->
 ------------> ------------> ------------> 
 
 local extMeta = { -- .ext() is a dynamic module
@@ -677,8 +745,28 @@ local extMeta = { -- .ext() is a dynamic module
         
    local extender,meta = {},{ -- extender -> returned by object:ext()   
             
-    __newindex = function(self,key,value) -- [newindex] object.ext[key] set / object[key] unwrapped
-     local store = getExtStore(obj) store[key],obj[key] = value, value(obj) end,
+    __newindex = function(self,keys,value) -- [newindex] object.ext[key] set / object[key] unwrapped
+    
+     local names,lastKey = {},""
+     if type(keys) == "string" then
+      table.insert(names,keys)
+     elseif type(keys) == "table" then
+      local key = keys[#keys]
+      table.insert(names,  _upperOrLower(key,true))
+      table.insert(names,
+       _upperOrLower(key,false))
+      lastKey = keys[#keys - 1]
+     end
+                
+     local store,ext = getExtStore(obj),ext
+     if #names >= 1 then ext = value(obj) end
+      
+     for i = 1,#names do
+      local key = lastKey..names[i]
+      store[key],obj[key] = value, ext
+     end 
+            
+    end,
             
     __index = function(extension,key) 
                 
@@ -692,51 +780,198 @@ local extMeta = { -- .ext() is a dynamic module
                 
       ext._prefix = _extSetter(extension, function(name,method) -- (passUp) object indexer / sorter
         return function(self)  
+         
+         ---- ---- ---- ---- ---- ----
                         
-         local extension,meta = {_isPrefix = true},{ 
+         local extension,meta = {
+           _isPrefix = true
+         } -- --- ---- ----- ------           
+                           
+         ---- ---- ---- ---- ---- ----
+                        
+         meta = { -- extension metadata
                             
           __type = "ext.prefix", 
           __self = obj,
                             
+          __data = {              
+            -- stores ext name path data                              
+            path = type(name) == "string" and {name} or type(name) == "table" and name                    
+          },
+                            
+          -------- ------ ---- >               
           -- (ext) returns prefix descriptor string        
+                            
           __tostring = function(pointer) 
-           local level,list,entry,key,val = self,{} while level do key,val = next(level)
-             while val do if string.find(key,"^"..name) then entry = string.gsub(key,"^"..name,"") 
-                if entry ~= "" then for i = 1,#list do if list[i] == entry then entry = "" break end end end
-                list[#list + 1] = entry ~= "" and entry or nil end key,val = next(level,key) end       
-             level = getmetatable(level) level = level and level.__proto end table.sort(list)
-         return "(ext.prefix _:"..name.."|...|):{"..table.concat(list,", ").."}" end,        
-                                                   
-         -- declaration: obj.|prefix|.|name| = method                        
-         __newindex = function(pointer,key,value) 
-                             
-           -- _caseStr: converts first char of string to lowercase or uppercase 
                                 
-           local _caseStr = function(str,upper)
-             local format = function(a,b) 
-             local upperOrLower = upper and string.upper or string.lower
-              return upperOrLower(a)..b end
-             return string.gsub(str,"(%a)(%a+)",format) end
+           local list,meta,key,val = {}, getmetatable(pointer)
                                 
-           local entry,internal = tostring(key) 
-           local names = {_caseStr(entry,true),_caseStr(entry,false)}
+           local path = meta.__data.path
+           local methodName = path[#path]
+           local prefix = concat(path)                                                 
+           local level = pointer.self
                                 
-          for i = 1,2 do
-           local entry = name..names[i]
-           if not value and not rawget(self,entry) then
-            internal = false error("Extension cannot modify superclass.",2) else internal = true end
-            self[entry] = (not value and internal) and nil or value
-           end                
-          end,
+           while(level) do 
+                                    
+            key,val = next(level,key)    
+            if not key then break end  
+
+            local name = string.match(key,concat{"^",prefix,"([%w_]+)$"})
+            
+            if name then 
+             table.insert(list,name)
+            end end
+                                
+           table.sort(list) 
+                                
+           ------ ---- ------ ---- --
+           -- object.ext.tostring()
+           ------ ---- ------ ---- --   
+                                             
+           -- the __self an extension could also be serialized here ... [descriptors.osd ] -- TBD
+                                
+           local osd = _objSerialDescriptor                  
+           local descriptors = {
+            "self", osd = concat(
+             {"(",osd(pointer.self),")"})
+           } --- ---- --- ---- ----
+           ------ ---- -- ---- --           
+           local extTag = concat{"[::",descriptors[1],".",concat(path,"."),"::]"}  
+           ------ ---- -- ---- --
+           return concat{"(ext.prefix[",
+           #list,"]: ",extTag,"):{",concat(list,", "),"}"}
+           ------ ---- -- ---- --
+                                
+         end,       
                             
          ---- ---- ---- ---- ---- ----
+         -------- ------ ---- >  
+                                                                             
+         -- declaration: obj.|prefix|.|name| = method                        
+         __newindex = function(pointer,key,value) 
+                                
+           -- print("##### newindex invoked")
+                             
+           -- _caseStr: converts first char of string to lowercase or uppercase                  
+           local _c = _upperOrLower
+                                
+           local entry,internal = tostring(key) 
+                                
+          --[[         
+          local meta = getmetatable(pointer)       
+          local dataPath = meta.__data.path
+          ]]
+                                
+          local nameIsTable = type(name) == "table"            
+          local suffix,prefix = name, ""
+          if nameIsTable then
+            suffix,prefix = name[#name], name[#name - 1] end
+        
+          if objectDebug.extensions then       
+           print(concat{"__newindex called for extension: [[ ",suffix,' ]] \nwith key: "',key,'".'})
+          end
+
+         ---- ---- ---- ----    
+                                                
+         local extNames = {
+          _c(entry,true), _c(entry,false)}
+                                 
+         for i = 1,2 do
+                                    
+          if nameIsTable then 
+          table.insert(extNames,_c(suffix,true)..extNames[i])
+           extNames[i] = _c(suffix,false)..extNames[i]
+           
+          else extNames[i] = suffix..extNames[i] end
+                                    
+         end
+                                
+         ---- ---- ---- ----
+                                
+         for i = 1,#extNames do
+                                    
+           local entry = prefix..extNames[i]
+                                    
+           if not value and not rawget(self,entry) then
+            internal = false error("Extension cannot modify superclass.",2) 
+           else internal = true end
+                                    
+           self[entry] = (not value and internal) and nil or value
+                                    
+          end 
+                                               
+         end,
                             
-         __index = function(pointer,key) -- indexing statement: _.|prefix|:|name|()
+         ---- ---- ---- ---- ---- ----  
+         -------- ------ ---- > 
+                         
+         __index = function(pointer,key) -- indexing statement: _.|prefix|:|name|()    
+        
+          -- TBD note: these could be moved so that they are not on every extension (get/set?)
                                 
-          local key = name..tostring(key)
-          local path = self[key] local format = type(path)
+          -- returns: prefix self ref.
+          if key == "self" then         
+           return meta.__self               
+                                               
+          -- calling prefix.extend                 
+          elseif key == "extend" or key == "ext" then
+                                    
+           local extensionObj = {}
+           setmetatable(extensionObj,{   
+                                              
+            __type = "ext.extend",
+            __self = obj,
+                                                        
+            __call = function(self,_ext,str)                             
+              obj.extend(_ext,str)                              
+             end
+                                                                                                
+           }) 
+                                                            
+           return extensionObj
+                                                                
+          end 
                                 
-          if format == "function" then return function(v,...) -- redirector function for calls
+          ----- ---- ----- ----
+                                     
+          local data = meta.__data
+          local dataPath = data.path
+        
+          local firstName,_key = name        
+          if type(name) == "table" then firstName = name[#name]
+           _key = concat{
+             unpack(name,1,#name - 1)} 
+          else _key = firstName..tostring(key) end
+                                            
+          local methodName = _key  
+          local path = self[methodName]                
+          local format = type(path)
+                                
+          -- local directPath = self[key]
+                                           
+          -- print("#### Creating key path:",methodName,dataPath[#dataPath],concat(dataPath))
+                                 
+          if objectDebug.extensions then       
+           print(object.concat{"__index called for extension: [[ ",pointer,' ]] \nwith key: "',key,'", and name path:',object.tostring(dataPath,{style="vertical",
+             depth = 10})})
+          end                   
+                                
+          -- local callable = isFunctionOrCallableTable
+        
+          ---------- ---------- ----------         
+          -- temp. - if an ext.prefix is ever passed to a call, it should return it self key
+                                
+          local _isExtension = function(value)
+           local meta = getmetatable(value)
+           if meta and meta.__type == "ext.prefix" then return true 
+           else return false end
+          end
+                                
+          ---------- ---------- ----------  
+          
+          if format == "function" then 
+                                    
+           return function(v,...) -- redirector function for calls
                                 
             --[[
             if true and path then return function(...) 
@@ -760,17 +995,33 @@ local extMeta = { -- .ext() is a dynamic module
              return path(self,v,...)       
             end
 
-            ---- ------ ---- ------ ---- ------                       
-           end 
-                            
-         elseif key ~= "__self" then 
-          -- print("fell through to __self ...")
-          return path end  
-                                
+            ---- ------ ---- ------   
+                                           
+         end        
+        
+        -- hanles sub extensions                                                
+        elseif _isExtension(pointer) and data.prev then print("i am here")
+         
+         local path = concat(dataPath)..key
+                  
+         -- note: could be used to replace lazy load - so then you dont necessarily need an _exIndex - TBD
+                                    
+          return function(pointer,...)
+            if not _isExtension(pointer) then 
+             return self[path](pointer,...) 
+            else
+             local self = pointer.self
+             return self[path](self,...)                  
+           end end                       
+                                                                                      
+        end                                        
+       
+         --print("got to here",pointer,key)                
         return path end, -- returns: redirector or key actual 
-                            
-        ---- ---- ---- ---- ---- ----
-                            
+                                        
+        ---- ---- ---- ---- ---- ----  
+        -------- ------ ---- >    
+                              
         __call = function(pointer,obj,...) -- calling statement: _:|prefix|() / _:|prefix|():|name|()          
                                      
          if not obj then return end local extra = select("#",...)
@@ -778,7 +1029,7 @@ local extMeta = { -- .ext() is a dynamic module
          local objType = type(obj)
                                 
          ------ ------ ------
-         --- WIP - use this to alow _ext():_prefix() methods to not return the prefix itself when called with no arguments 
+         --- WIP - use this to allow _ext():_prefix() methods to not return the prefix itself when called with no arguments 
                                 
          if _objectConfig.callChain == true then
                                 
@@ -808,7 +1059,7 @@ local extMeta = { -- .ext() is a dynamic module
 -- Sets up metatable for object.ext
 setmetatable(object._ext,extMeta)
 
-------------------------------------------------------------------
+---------- ---------- ---------- -----
 -- Primitive Object Constructor -> object:new() | object()
 
 -- The new metamethods for an object subclass are passed at the time of initialization. If metatable elements are detected, they are removed from the objects methods and added to its metatable. The imput object as well as the output object retured can be used to add new methods and values to a class, but new metamethods will not be detected after initial initialization.
@@ -849,15 +1100,53 @@ return self end -- returns: new object instance
 
 ---------- ---------- ----------
 
--- WIP - object.extend creates a prefix based on a key so that it can function such as object.insertFirst | object.insert.first | object.insert:First etc. 
+-- object.extend / :ext() - creates a extension on a key so that it can function such as object.insertFirst | object.insert.first | object.insert:First etc. where the 'ext' is object.insert
 
 object.extend = function(self,key)
+    
  if not self or type(self) ~= "table" then 
   return end
- if self[key] and 
-  isFunctionOrCallableTable(self[key]) then 
-   self:_ext():_prefix()[key] = self[key]
-  end end
+
+ local meta = getmetatable(self)
+ local type = meta and meta.__type and meta.__type or type
+ 
+ local _self,path = self,key
+ local callable = isFunctionOrCallableTable   
+ local isExtension = type == "ext.extend" or type == "ext.prefix"  
+   
+ if objectDebug.extensions == true then
+        
+  if not isExtension then
+   print(concat{'{{ object.extend }} Creating an extension for object type: "',type,'", \nwith key: "',key,'"'})
+            
+  else
+   print(object.concat{'{{ object.extend }} Creating a (sub)extension for ext object: [[ "',self,'" ]] \nin object: [[ ',meta.__self,' ]] \nwith key: "',key,'".'})
+        
+ end end
+    
+ if isExtension then
+  local dataPath = meta.__data.path
+  path = {unpack(dataPath),key}
+  key,self = concat(path), meta.__self
+ end
+    
+ local target = self[key] 
+ if target and callable(target) then
+  self:_ext():_prefix()[path] = target 
+  
+  -- sets the data.prev for nested exts
+  if isExtension then -- this may be moved 
+   local ext = self[concat(path)]
+   local extMeta = getmetatable(ext)
+   extMeta.__data.prev = _self
+            
+ end end       
+        
+end
+
+----- ----> ----- ---- -----> ----
+object.ext = object.extend ----->
+----- ----> ----- ---- -----> ----
 
 -------------------- -------------------- --------------------     
 -- (_.insert, _.remove) - Prefix Block Extensions
