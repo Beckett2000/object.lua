@@ -28,7 +28,7 @@ function setup()
 end
 
 -------------------------------------------
--- inline test implementatuons ...
+-- inline test implementations ...
 -------------------------------------------
 
 testObject = function()
