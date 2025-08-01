@@ -20,7 +20,7 @@ local _timestamp -- today: (hh:mm:ss)
 
 local objectTests = {
  extend = {}, api = {}, tostring = {}, 
- print = {}
+ print = {}, class = {}, structs = {}
 }
 
 ------------------------------------------->
@@ -238,7 +238,6 @@ objectTests.api["4-05-25:(2)"] = function()
     
 end
 
-
 ------ ------ ------ ------ ------
 
 objectTests.print["4-11-25 (printing)"] = function()
@@ -318,6 +317,102 @@ objectTests.print["4-11-25 (prettyPrint)"] = function()
 
 end
 
+------ ------ ------ ------ ------
+
+objectTests.extend["8-01-25:(nested)"] =
+function()
+  
+   ------- ------ ----- ------ ------- >>
+   -- Object class declarations ...
+  
+   local baseObject = object{"a",44,"b",a=4,22,"c","d",1,2,3,4,5,"e",3.14159,"ff","tree","leaves"}
+  
+   ------ ---- ------ ---- ------ ---- 
+  
+   baseObject.list = function(self)
+    return self:indexies()
+   end
+  
+   ------ ---- ------ ---- ------ ----  
+   baseObject:ext("list") 
+   ------ ---- ------ ---- ------ ----
+     
+   baseObject.list.numbers = function(self)
+
+    local numbers = object()
+    for _,index in pairs({self:indexies()}) do
+     if type(index) == "number" then
+      numbers:push(index) end end
+     return numbers
+  
+   end 
+  
+   baseObject.list.strings = function(self)
+    
+     local strings = object()
+     for _,index in pairs({self:indexies()}) do
+       if type(index) == "string" then
+        strings:push(index) end end
+      return strings
+    
+   end
+  
+   ------ ---- ------ ---- ------ ----
+   local list = baseObject.list
+   ------ ---- ------ ---- ------ ----
+   list:extend("numbers")
+   ------ ---- ------ ---- ------ ----
+  
+   -- (helper) - list even or odd indexies
+   local function _evenOrOdd(self,even)
+     
+    local numbers = self.list:numbers()
+    local numberList = object()
+    for i = 1,#numbers do
+     local number = numbers[i]
+     if number % 2 == (even and 0 or 1) then
+       numberList:push(number)
+     end end    
+    return numberList
+    
+  end
+  
+  ---- ---- ----
+  
+  list.numbers.even = function(self)
+    return _evenOrOdd(self,true)  
+   end
+  
+  list.numbers.odd = function(self)
+    return _evenOrOdd(self,false)  
+  end
+  
+  
+  ------- ------ ----- ------ ------- >>
+  -- Tests below this point ...
+  
+  print("(*) ---- ----- ----")
+  
+  print("This is the baseObject:",
+    baseObject:tostring("v"))
+  
+  print("numbers:",
+    baseObject.list:numbers())
+  
+  print("strings:",
+    baseObject.list:strings())
+  
+  print("odd numbers:",
+    baseObject.list:numbersOdd())
+  
+  print("even numbers:",
+    baseObject.list.numbers:even())
+  
+  print("---- ----- ---- (*)")
+  
+  ------ ---- ------ ---- ------ ----
+  
+end
 
 -------------------------------------------
 -- private methods ...
