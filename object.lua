@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.10 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (4-15-25)
+-- object.lua - 3.10 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-01-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -107,9 +107,13 @@ local _isObject, _firstOrLast, _indexOf
 ------------ ------------ ------------ 
 -- Debug Logs for object class
 ------------ ------------ ------------ 
+
 local objectDebug = {
   extensions = false
 }
+
+------------ ------------ ------------ 
+-- objectDebug = false
 ------------ ------------ ------------ 
 
 local meta = {__index = self, __type = "object class", __version = true,
@@ -189,15 +193,16 @@ local _tostringSettings = {
 
 handleToString = function(value,opt)
 
-   local isObject = _isObject(value)
-
-   local concat,unpack = 
-    table.concat,table.unpack
-    
+    local concat,unpack = 
+     table.concat,table.unpack
+  
+    local isObject = _isObject(value)
     local handleStr,objStr = handleToString, _objSerialDescriptor
     
     local settings = object.copy(_tostringSettings)
-    
+  
+   ---- --- ---- --- ---- --- ----
+  
    local self, meta = value
    local entries,value = {} 
    local formatK,formatV,isObjectV
@@ -208,8 +213,8 @@ handleToString = function(value,opt)
     local data = getDataStore(self,false)
     if data and data.tostring then
       settings = data.tostring    
-   end end
-
+    end end
+  
    ---- --- ---- --- ---- --- ----
    -- options to the tostringHandler
     
@@ -221,9 +226,9 @@ handleToString = function(value,opt)
    
    if opt and type(opt) == "table" then
     
-    if type(opt.offsets) == "boolean" then
+    if opt.offsets ~= nil and type(opt.offsets) == "boolean" then
      settings.offsets = opt.offsets end
-    if type(opt.lengths) == "boolean" then
+    if opt.lengths ~= nil and type(opt.lengths) == "boolean" then
      settings.lengths = opt.lengths end
         
     settings.depth = opt.depth and type(opt.depth) == "number" and floor(abs(opt.depth)) or settings.depth
@@ -263,7 +268,7 @@ handleToString = function(value,opt)
    local nested = settings.data.nested
     
    ---- --- ---- --- ---- --- ----
-    
+
    local descriptor = type(self)
    if descriptor == "table" then descriptor = objStr(self,settings) end
     
@@ -783,10 +788,12 @@ local extMeta = { -- .ext() is a dynamic module
          
          ---- ---- ---- ---- ---- ----
                         
-         local extension,meta = {
+         local extension,meta = {},{
            _isPrefix = true
          } -- --- ---- ----- ------           
-                           
+        
+         ---- ---- ---- ---- ---- ----
+         local _meta = meta               
          ---- ---- ---- ---- ---- ----
                         
          meta = { -- extension metadata
@@ -794,7 +801,7 @@ local extMeta = { -- .ext() is a dynamic module
           __type = "ext.prefix", 
           __self = obj,
                             
-          __data = {              
+          __data = {             
             -- stores ext name path data                              
             path = type(name) == "string" and {name} or type(name) == "table" and name                    
           },
@@ -870,9 +877,7 @@ local extMeta = { -- .ext() is a dynamic module
           if objectDebug.extensions then       
            print(concat{"__newindex called for extension: [[ ",suffix,' ]] \nwith key: "',key,'".'})
           end
-
-         ---- ---- ---- ----    
-                                                
+                                                 
          local extNames = {
           _c(entry,true), _c(entry,false)}
                                  
@@ -898,10 +903,9 @@ local extMeta = { -- .ext() is a dynamic module
                                     
            self[entry] = (not value and internal) and nil or value
                                     
-          end 
-                                               
+          end                                       
          end,
-                            
+              
          ---- ---- ---- ---- ---- ----  
          -------- ------ ---- > 
                          
@@ -1000,7 +1004,7 @@ local extMeta = { -- .ext() is a dynamic module
          end        
         
         -- hanles sub extensions                                                
-        elseif _isExtension(pointer) and data.prev then print("i am here")
+        elseif _isExtension(pointer) and data.prev then -- print("* sub ext")
          
          local path = concat(dataPath)..key
                   
@@ -1018,6 +1022,7 @@ local extMeta = { -- .ext() is a dynamic module
        
          --print("got to here",pointer,key)                
         return path end, -- returns: redirector or key actual 
+                              
                                         
         ---- ---- ---- ---- ---- ----  
         -------- ------ ---- >    
@@ -1037,12 +1042,20 @@ local extMeta = { -- .ext() is a dynamic module
           elseif extra == 0 and objType == "table" then 
                                  
             -- print("Handling _ext store for calling ...")
+                    
            return obj[name] and obj[name] or getBackReference(pointer)[name]  
                                         
           end
                                    
          else ------ ------ ------
-          return method(obj,...) end end 
+                  
+          local target = obj while target do
+           meta = getmetatable(target)
+           if meta and meta.__self then 
+            target = meta.__self
+           else break end end
+               
+          return method(target,...) end end 
                             
          ---- ---- ---- ---- ---- ----
                             
@@ -1078,10 +1091,14 @@ object.new = function(super,self) -- (object) - base constructor
         
   for k,v in pairs(superMeta) do 
    if meta[k] == nil then 
-    meta[k] = type(v) ~= "table" and v or object.copy(v) end 
+    meta[k] = type(v) ~= "table" and 
+     v or object.copy(v,{
+      depth = math.huge, meta = true
+    }) end  
   end
      
   meta.__type = super == _object and "object" or meta.__type 
+  
   self = type(self) == "table" and 
    self or {}
     
@@ -1633,7 +1650,7 @@ object.hasKeys = function(self,...)
  end return true end
         
 object.indexies = function(self)
-    return unpack(self,1,#self)
+  return unpack(self,1,#self)
 end
         
 -------- -------- -------- -------- 
@@ -1655,7 +1672,7 @@ object.first.IndexOf = function(self,...)
 -------- -------- -------- -------- 
 
 object.last = function(self,count) 
-    return _firstOrLast(self,-1,count) 
+  return _firstOrLast(self,-1,count) 
 end -- returns: last entrie(s)
 
 object:extend("last")
@@ -1699,27 +1716,94 @@ end
 -------- -------- -------- -------- 
 -- object.copy|...| -- TODO Prefix
 -------- -------- -------- --------
+-- object.copy: replaces an object based on the memory access pointer locations at a given level for a lua data type
+-------- -------- -------- --------
 
-object.copy = function(self) -- Creates a deep copy of object table and metatable
+local _copy -- helper: copies objects
+_copy = function(self,depth)
+  
+  if not self or depth == 0 then
+   return self end
+  
+  local copy = {} 
+  for k,v in pairs(self) do 
     
-    if type(self) ~= "table" then
-     -- error("object.copy: self was not table. ",self)
-     return self
-    end
-
-    local meta,metaFm,copy = {}, getmetatable(self) or {},{} 
-    
-    for k,v in pairs(metaFm) do 
-     meta[k] = v end
-    
-    for key,value in pairs(self) do 
-     if type(value) ~= "table" then copy[key] = value
-     else copy[key] = object.copy(value)
-    end end setmetatable(copy,meta) 
-    
-    return copy 
-    
+    local value,type = self[k],type(v)
+    if type == "string" or type == "number" 
+     or type == "boolean" then copy[k] = v 
+      
+    elseif type == "table" or 
+     type == "function" then
+     if depth == 1 then copy[k] = v
+     else copy[k] = _copy(v, depth - 1)
+    end end end
+  
+  return copy
+  
 end -- returns: object - copy of object
+
+-------- -------- -------- --------
+-- creates a copy of a table / object 
+-- opt: {depth: number, meta: boolean}
+---- ---- ---- ---- ---- ---- ---- ----
+
+object.copy = function(self,opt,ext)
+  
+  if not _canFunctionRun{ 
+   method = "object.copy",
+   types = {"table"}, self = self } 
+  then return end
+  
+  local depth,meta = 1, true
+  
+  if opt then
+    
+   if type(opt) == "number" then
+    depth = opt end
+    
+   meta = (opt.meta and type(opt.meta) == "boolean") or true
+   depth = (opt.depth and type(opt.depth) == "number") or 1
+  end
+  
+  local copy = _copy(self,depth)
+  local meta = getmetatable(self)
+  
+  if meta then 
+   setmetatable(copy, _copy(meta)) 
+  end
+  
+  return copy
+  
+end
+
+-------- -------- -------- -------- 
+object:extend("copy")
+-------- -------- -------- -------- 
+
+object.copy.deep = function(self) -- Creates a deep copy of object table and metatable
+  
+  if type(self) ~= "table" then
+    -- error("object.copy: self was not table. ",self)
+    return self
+  end
+  
+  local meta,metaFm,copy = {}, getmetatable(self) or {},{} 
+  
+  for k,v in pairs(metaFm) do 
+    meta[k] = v end
+  
+  for key,value in pairs(self) do 
+    if type(value) ~= "table" then copy[key] = value
+    else copy[key] = object.copy(value)
+    end end setmetatable(copy,meta) 
+  
+  return copy 
+  
+end -- returns: object - copy of object
+
+-------- -------- -------- -------- 
+
+--object.copy:Keys() object.copy:Hash() object.copy:Indexies() object.copy:Meta()
 
 -------- -------- -------- -------- 
 
@@ -1872,13 +1956,22 @@ end
 
 ----- ------ ------ ------ ------ ------
 
-object.toString = function(self,options) 
+object.toString = function(self,opt) 
 
   if not _canFunctionRun { 
    method = "object.toString",
    types = {"table","string","number",
     "function","boolean","nil"},
    self = self } then return end
+  
+  -- string printing options to toString
+  local optType = opt and type(opt)
+  if optType == "string" then
+    if opt == "vertical" or opt == "v" then 
+      opt = object.copy(_tostringSettings)
+      opt.style = "vertical"
+    end
+  end
 
   -- certain types are passed through to tostring unchanged
     
@@ -1887,12 +1980,12 @@ object.toString = function(self,options)
   elseif type == "boolean" or type == "number" or type == "nil" then
    return tostring(self)     
   end
-    
+  
   -- tables and functions are passed to the toStringHandler
     
   local meta = getmetatable(self)
-  if meta and meta.__tostring and not options then return tostring(self) end
-  return handleToString(self,options)
+  if meta and meta.__tostring and not opt then return tostring(self) end
+  return handleToString(self,opt)
     
 end
 
@@ -1916,12 +2009,13 @@ object.toString.config = function(self,opt)
    data.tostring =
     object.copy(_tostringSettings)
   end
-    
+  
   local tostringSettings = data.tostring
     
   ---------- ---------- ---------- ------
   local settings = getToStringSettings()
   ---------- ---------- ---------- ------
+  
     
   for k,v in pairs(opt) do
     local setting = settings[k]
