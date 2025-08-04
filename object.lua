@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.10 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-01-25)
+-- object.lua - 3.10 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-03-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -530,8 +530,9 @@ local _upperOrLower = function(str,upper)
 local function getInheritedValue(self,proto,key) 
     
  --print("getInheritedValue was called:",self,prototype:toString())
-
- local protoIndex = getmetatable(proto).__index
+  
+ local meta = getmetatable(proto)
+ local protoIndex = meta.__index
  local callable = isFunctionOrCallableTable
     
  -- wrapper creation from ext in proto of object (self) -> returned wrapper is stored in self:meta():__exIndex
@@ -545,11 +546,13 @@ local function getInheritedValue(self,proto,key)
   if objectType == "ext.extend" then return end -- you should never get an extend obj here ...
         
   if objectType == "ext.prefix" then
-            
+        
    local wrapper = 
     proto._ext[key](self)
+      
+   -- print("The wrapper:",wrapper,self,getmetatable(wrapper).__self)
             
-    if objectDebug.extensions then
+   if objectDebug.extensions then
     print(object.concat{"getInheritedValue(): '",objectType,"' wrapper created from extension: [",proto[key],"] with key: '", key,"' for object: [",self,"]."}) end
 
    local wrapperMeta = getmetatable(wrapper)
@@ -619,7 +622,7 @@ local function initExtensionLayer(self) -- (private) initializes object extensio
      -- print("This is where the proto index is being used ...")
         
      if (protoIndex and protoIndex[key] ~= super[key]) or keyIsModified then 
-            
+
        exIndex[key] = getInheritedValue(self,backRef,key) 
      
        if objectDebug.extensions then
@@ -747,19 +750,21 @@ local extMeta = { -- .ext() is a dynamic module
   __call = function(ext,obj)  -- invoked when calling object:ext()
    if not obj then error("invalid arg. no.1 (lua table) to object.ext().",2) 
    return end 
-        
-   local extender,meta = {},{ -- extender -> returned by object:ext()   
+
+   local proxy,meta = {},{ -- ::proxy:: -> returned by object:ext()   
             
     __newindex = function(self,keys,value) -- [newindex] object.ext[key] set / object[key] unwrapped
-    
+        
      local names,lastKey = {},""
+     local _c = _upperOrLower
+     local insert = table.insert
+        
      if type(keys) == "string" then
-      table.insert(names,keys)
+      insert(names,keys)
      elseif type(keys) == "table" then
       local key = keys[#keys]
-      table.insert(names,  _upperOrLower(key,true))
-      table.insert(names,
-       _upperOrLower(key,false))
+      insert(names,_c(key,true))
+      insert(names,_c(key,false))
       lastKey = keys[#keys - 1]
      end
                 
@@ -785,7 +790,7 @@ local extMeta = { -- .ext() is a dynamic module
                 
       ext._prefix = _extSetter(extension, function(name,method) -- (passUp) object indexer / sorter
         return function(self)  
-         
+            
          ---- ---- ---- ---- ---- ----
                         
          local extension,meta = {},{
@@ -799,7 +804,7 @@ local extMeta = { -- .ext() is a dynamic module
          meta = { -- extension metadata
                             
           __type = "ext.prefix", 
-          __self = obj,
+          __self = self, -- obj
                             
           __data = {             
             -- stores ext name path data                              
@@ -864,11 +869,6 @@ local extMeta = { -- .ext() is a dynamic module
                                 
            local entry,internal = tostring(key) 
                                 
-          --[[         
-          local meta = getmetatable(pointer)       
-          local dataPath = meta.__data.path
-          ]]
-                                
           local nameIsTable = type(name) == "table"            
           local suffix,prefix = name, ""
           if nameIsTable then
@@ -910,7 +910,7 @@ local extMeta = { -- .ext() is a dynamic module
          -------- ------ ---- > 
                          
          __index = function(pointer,key) -- indexing statement: _.|prefix|:|name|()    
-        
+
           -- TBD note: these could be moved so that they are not on every extension (get/set?)
                                 
           -- returns: prefix self ref.
@@ -918,7 +918,7 @@ local extMeta = { -- .ext() is a dynamic module
            return meta.__self               
                                                
           -- calling prefix.extend                 
-          elseif key == "extend" or key == "ext" then
+          elseif key == "extend" or key == "ext" or key == "proxy" then
                                     
            local extensionObj = {}
            setmetatable(extensionObj,{   
@@ -940,20 +940,13 @@ local extMeta = { -- .ext() is a dynamic module
                                      
           local data = meta.__data
           local dataPath = data.path
-        
-          local firstName,_key = name        
-          if type(name) == "table" then firstName = name[#name]
-           _key = concat{
-             unpack(name,1,#name - 1)} 
-          else _key = firstName..tostring(key) end
-                                            
-          local methodName = _key  
-          local path = self[methodName]                
+          local _key = concat(dataPath)..key
+          
+          -- (lazy load) on methodName index      
+          local path = self[_key]                
           local format = type(path)
                                 
-          -- local directPath = self[key]
-                                           
-          -- print("#### Creating key path:",methodName,dataPath[#dataPath],concat(dataPath))
+          -- local directPath = self[key]         
                                  
           if objectDebug.extensions then       
            print(object.concat{"__index called for extension: [[ ",pointer,' ]] \nwith key: "',key,'", and name path:',object.tostring(dataPath,{style="vertical",
@@ -974,24 +967,17 @@ local extMeta = { -- .ext() is a dynamic module
           ---------- ---------- ----------  
           
           if format == "function" then 
-                                    
+
            return function(v,...) -- redirector function for calls
-                                
-            --[[
-            if true and path then return function(...) 
-              return path(...) end end
-            ]] --end
                                         
             --- --- -----
     
             if v == pointer then return path(self,...)
-                                            
-            -- elseif pointer._isPrefix == true then print("ok") return pointer
-                                            
+
             elseif self == object then return object[key](v,...)          
             end
                                         
-            ---- ------ ---- ------ ---- ------
+            --- --- -----
                                         
             -- overload: objectInst.[ext].[val] points to objectInst i.e. tree.insert.first("apple") -> tree{"apple"}
                                         
@@ -1003,9 +989,11 @@ local extMeta = { -- .ext() is a dynamic module
                                            
          end        
         
+        ---------- ---------- ----------
+                  
         -- hanles sub extensions                                                
         elseif _isExtension(pointer) and data.prev then -- print("* sub ext")
-         
+
          local path = concat(dataPath)..key
                   
          -- note: could be used to replace lazy load - so then you dont necessarily need an _exIndex - TBD
@@ -1019,23 +1007,31 @@ local extMeta = { -- .ext() is a dynamic module
            end end                       
                                                                                       
         end                                        
-       
-         --print("got to here",pointer,key)                
+        
+        ---------- ---------- ----------
+                
+        -- local meta = getmetatable(path)
+        -- print(path,meta.__self)       
+                
         return path end, -- returns: redirector or key actual 
-                              
-                                        
+  
         ---- ---- ---- ---- ---- ----  
         -------- ------ ---- >    
                               
-        __call = function(pointer,obj,...) -- calling statement: _:|prefix|() / _:|prefix|():|name|()          
-                                     
+       __call = function(pointer,obj,...) -- calling statement: _:|prefix|() / _:|prefix|():|name|()          
+         
+         ------ ------ ------ -------
+         local target = getBackReference(obj)
+         ------ ------ ------ -------
+                                                   
          if not obj then return end local extra = select("#",...)
          local meta = obj and getmetatable(pointer)
          local objType = type(obj)
-                                
+         
          ------ ------ ------
+                
          --- WIP - use this to allow _ext():_prefix() methods to not return the prefix itself when called with no arguments 
-                                
+                          
          if _objectConfig.callChain == true then
                                 
           if obj == pointer and extra == 0 then return pointer                
@@ -1045,19 +1041,13 @@ local extMeta = { -- .ext() is a dynamic module
                     
            return obj[name] and obj[name] or getBackReference(pointer)[name]  
                                         
-          end
-                                   
-         else ------ ------ ------
-                  
-          local target = obj while target do
-           meta = getmetatable(target)
-           if meta and meta.__self then 
-            target = meta.__self
-           else break end end
-               
-          return method(target,...) end end 
+         end end
+                      
+        ------ ------ ------
+                               
+        return method(target,...) end 
                             
-         ---- ---- ---- ---- ---- ----
+        ---- ---- ---- ---- ---- ----
                             
          } setmetatable(extension,meta) return extension end end ) 
                 
@@ -1065,9 +1055,9 @@ local extMeta = { -- .ext() is a dynamic module
             
      } -- returns: pointer to method in entry
         
-    setmetatable(extender,meta) 
+    setmetatable(proxy,meta) 
         
- return extender end }
+ return proxy end } -- returns: proxy table 
 
 -- Sets up metatable for object.ext
 setmetatable(object._ext,extMeta)
@@ -1120,7 +1110,7 @@ return self end -- returns: new object instance
 -- object.extend / :ext() - creates a extension on a key so that it can function such as object.insertFirst | object.insert.first | object.insert:First etc. where the 'ext' is object.insert
 
 object.extend = function(self,key)
-    
+
  if not self or type(self) ~= "table" then 
   return end
 
