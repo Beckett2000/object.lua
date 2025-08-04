@@ -163,7 +163,7 @@ objectTests.extend["4-14-25"] = function()
     
     print("End test ext.prefix: plant: [",plant,"], clover: [",clover,"].")
 
-    --[[ expected output:
+    print([[ expected output:
 
       (object[3]: 0x311f94a80):{01:"a", 02:"b", 03:"c"}
       The plant grew:	(object[6]: 0x311f94a80):{01:"a", 02:"b", 03:"c", 04:"a", 05:"b", 06:"c", grow:(function: 0x3048c9cb0)}
@@ -174,7 +174,7 @@ objectTests.extend["4-14-25"] = function()
       Now there are leaves:	(object[6]: 0x311f3bd40):{01:"leaves", 02:"sprout", 03:"sprout", 04:"sprout", 05:"sprout", 06:"leaves"}
       End test ext.prefix: plant: [	(object[8]: 0x311f94a80):{01:"leaves", 02:"a", 03:"b", 04:"c", 05:"a", 06:"b", 07:"c", 08:"leaves", growleaves:(function: 0x3048d1ad0), growLeaves:(function: 0x3048d1ad0), grow:(ext.prefix[0]: 0x311f7be80: { __tostring = "(ext.prefix _:grow|...|):{Leaves, leaves}" })}	], clover: [	(object[6]: 0x311f3bd40):{01:"leaves", 02:"sprout", 03:"sprout", 04:"sprout", 05:"sprout", 06:"leaves"}	].
 
-    --]]
+    ]])
     
 end
 
@@ -257,10 +257,8 @@ objectTests.print["4-11-25 (printing)"] = function()
     lengths = true,
     depth = 1
   }))
-
-  --[[
-
-  output: 
+  
+  print( [[expected output: 
 
   (object[2]: 0x307a7a1c0):{
     01:"leaves", 
@@ -273,7 +271,7 @@ objectTests.print["4-11-25 (printing)"] = function()
     customTable:(table[2]: 0x307a78b00: { __tostring = "a b c d e f" })
   }
 
-  ]]
+  ]])
 
 end
 
@@ -299,7 +297,7 @@ objectTests.print["4-11-25 (prettyPrint)"] = function()
   
   ------ ------ ------ ------>>
   
-  --[[ output:
+  print( [[ expected output:
   
   (object[2]: 0x306f20140):{
     ....01:"leaves", 
@@ -313,7 +311,7 @@ objectTests.print["4-11-25 (prettyPrint)"] = function()
     ....}
   }
   
-]]
+]])
 
 end
 
@@ -411,6 +409,19 @@ function()
   print("---- ----- ---- (*)")
   
   ------ ---- ------ ---- ------ ----
+
+  local wordsAndNumbers = baseObject({1,2,3,4,5,"string","table","print","tostring",10,9,16,25,36,49,64,81,121,144,169,"tree","leaves"})
+  
+  print("This is wordsAndNumbers:", wordsAndNumbers)
+  
+  print("List Indexies: (wordsAndNumbers):",
+  wordsAndNumbers:list())
+  
+  print("strings:",
+  wordsAndNumbers.list:strings())
+  
+  print("odd numbers:",
+  wordsAndNumbers.list.numbers:odd())
   
 end
 
