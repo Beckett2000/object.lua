@@ -918,7 +918,7 @@ local extMeta = { -- .ext() is a dynamic module
            return meta.__self               
                                                
           -- calling prefix.extend                 
-          elseif key == "extend" or key == "ext" or key == "proxy" then
+          elseif key == "extend" or key == "ext" then
                                     
            local extensionObj = {}
            setmetatable(extensionObj,{   
@@ -1711,10 +1711,10 @@ end
 
 local _copy -- helper: copies objects
 _copy = function(self,depth)
-  
+
   if not self or depth == 0 then
    return self end
-  
+
   local copy = {} 
   for k,v in pairs(self) do 
     
@@ -1723,7 +1723,7 @@ _copy = function(self,depth)
      or type == "boolean" then copy[k] = v 
       
     elseif type == "table" or 
-     type == "function" then
+    type == "function" then  
      if depth == 1 then copy[k] = v
      else copy[k] = _copy(v, depth - 1)
     end end end
@@ -1738,7 +1738,7 @@ end -- returns: object - copy of object
 ---- ---- ---- ---- ---- ---- ---- ----
 
 object.copy = function(self,opt,ext)
-  
+
   if not _canFunctionRun{ 
    method = "object.copy",
    types = {"table"}, self = self } 
@@ -1753,13 +1753,14 @@ object.copy = function(self,opt,ext)
     
    meta = (opt.meta and type(opt.meta) == "boolean") or true
    depth = (opt.depth and type(opt.depth) == "number") or 1
+    
   end
-  
+
   local copy = _copy(self,depth)
   local meta = getmetatable(self)
   
   if meta then 
-   setmetatable(copy, _copy(meta)) 
+   setmetatable(copy, _copy(meta,depth)) 
   end
   
   return copy
