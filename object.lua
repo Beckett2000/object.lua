@@ -664,12 +664,15 @@ local _proxy = function(ext,obj)
           if format == "function" then 
 
            return function(v,...) -- redirector function for calls
-                                        
+
             --- --- -----
     
             if v == pointer then return path(self,...)
 
-            elseif self == object then return object[key](v,...)          
+            elseif self == object then 
+             if object[key] then 
+              return object[key](v,...)
+             else return path(v,...) end
             end
                                         
             --- --- -----
@@ -679,7 +682,12 @@ local _proxy = function(ext,obj)
             if _objectConfig.dotObjectRef == true then
              return path(self,v,...)       
             end
-
+                  
+            ---- ------ ---- ------ 
+            -- fallthrough: return pointer to function with unchanged args
+                  
+            return path(v,...)
+                  
             ---- ------ ---- ------   
                                            
          end        
@@ -1022,9 +1030,11 @@ object.insert.atIndex = function(self,index,...)
      table.insert(self,index,arg)
      index = index + 1 end end
         
- end end -- returns: table (self)
+ return self end end -- returns: table (self)
 
 ------ ---- ------ ---- ------
+
+-- TBD - object.insert:fromTable(table) - potential proxy?
 
 -- Values can be inserted from an existing table rather than having to be ennumerated manually in the insert declaration. Other simpler method namespaces ( will also be ) utilized.
 
@@ -1312,9 +1322,9 @@ object.push = object.insertLast
 object.pop = object.removeLast
 object.slice = object.removeAtIndex
 
-------------------------------------------------------------------
--- Querying / Logging Methods
-------------------------------------------------------------------
+------- ------- ------- ------- ------- ----
+-- Querying / Search Methods
+------- ------- ------- ------- ------- ----
 
 -- An object is created with pointers to methods which can evaluate and modify data which is contained within an object. While these functions do exist in deeper object classes, they can be overriden by methods inherited from those classes.
 
@@ -1323,84 +1333,141 @@ object.slice = object.removeAtIndex
 object.countElements = function(self) -- gets number of elements in object
   local i,index = 0,next(self) while index do i = i + 1 index = next(self,index) end return i end
 
+-- TODO - change .length and .size to getters
 object.length = object.countElements
 object.size = object.countElements
 
-object.contains = function(self,val,...) -- determines if table contains entry
-  local num = select("#",...) if val and num == 0 then -- used if only one argument is passed
-        
-  local pairs = pairs for _,v in pairs(self) do if v == val then return true end end return false     
-    else local vals = {val,...} -- used if more than one argument is passed
-     local next,remove,total = next,table.remove,#vals local index,value = next(self)             
-      while index do for i = 1, total do if vals[i] == value then remove(vals,i) 
-       if total - 1 == 0 then return true else total = total - 1 break end end end      
-     index,value = next(self,index) end end return false end -- returns: true or false
-
 -------- -------- -------- -------- 
 
--- (Note 4-05) These methods need to be refactored
+-- object:contains(...) - determines if one or more entries exists in a source table
 
-object.indexiesOf = function(self,val,...) -- finds all numerical indexies of arguments
-    local out = {} if select("#",...) == 0 then for index = 1,#self do -- handles one index query
-            if self[index] == val then table.insert(out,index) end end return out -- returns: indexies array
-    else local values,target,val = {val,...} -- handles multiple index queries
-        for i = 1,#values do val,target = values[i],{} table.insert(out,target) for index = 1,#self do
-                if self[index] == val then table.insert(target,index) end end  end
-    return unpack(out) end end -- returns: vararg of index arrays
+object.contains = function(self,...) -- determines if table contains entry
+  
+ local count = select("#",...)
+ if count == 1 then; local val = select(1,...)
+  for _,v in pairs(self) do if v == val then return true end end return false end
 
-object.keysOf = function(self,val,...) -- finds all numerical indexies and keys of arguments
-    local out = {} if select("#",...) == 0 then -- handles one keys query
-        local key,value = next(self) while key do if value == val then table.insert(out,key) end 
-        key,value = next(self,key) end return out -- returns: array of keys
-    else local values,target,key,val,value = {val,...} -- handles multiple index queries
-        for i = 1,#values do val,target = values[i],{} table.insert(out,target) key,value = next(self) 
-            while key do if value == val then table.insert(target,key) end key,value = next(self,key) end end
-    return unpack(out) end end -- returns: vararg of key arrays
+ local args,vals,arg = {...},{} -- used if more than one argument is passed
+  for i = 1,#args do arg = args[i]
+   if arg == nil then return false
+   elseif not vals[arg] then vals[arg] = true
+   else count = count - 1 end
+ end
+    
+ local index,value = next(self)             
+ while value do 
+  if vals[value] then
+   vals[value] = nil count = count - 1
+   if count == 0 then return true end
+  end  
+ 
+  index,value = next(self,index) end 
+  
+ return false end -- returns: true or false
 
--------- -------- -------- -------- 
--- object.keys 
--------- -------- -------- -------- 
+-------- -------- -------- --------
 
-object.keys = function(self) -- gets keys of an object 
-  local keys = {} local pos,index = 1,next(self) while index do 
-  keys[pos],index = index,next(self,index) pos = pos + 1 end
-return keys end -- returns: array of table keys
+-- (private) helper: finds entry in table - used for :indexiesOf(...), :keysOf(...), and :find(...)
 
--- object:extend("keys")
+local function _findEntries(self,form,...)
+
+  local out,index,val = {}, next(self)
+  local args,vals,arg = {...},{}
+  for i = 1,#args do arg = args[i]
+   if args ~= nil then vals[arg] = true end
+  end
+  
+  while(index) do
+   if vals[val] then 
+      local _type = type(index)
+      if form == "keys" and _type ~= "number" or form == "indexies" and _type == "number" or not form then
+      table.insert(out,index) end
+    end index,val = next(self,index)
+  end return unpack(out)
+  
+end
+
+---- ---- ------
+
+-- object.indexies(self) - gets a list of the indexies declared in a source table
+
+object.indexies = function(self)
+  return unpack(self,1,#self)
+end
+
+---- ---- ------
+
+-- object:indexiesOf(...) - finds the indexies of one or more values in a source table
+
+object.indexiesOf = function(self,...)
+  return _findEntries(self,"indexies",...)
+end
+
+---- ---- ------
+
+-- object.keys(self) - gets a list of the keys declared in a source table
+
+object.keys = function(self) 
+  
+ local insert = table.insert
+ local keys,index = {},next(self)
+ while index do 
+   if type(index) ~= "number" then
+    table.insert(keys,index) end
+   index = next(self,index) end
+  
+ return unpack(keys) end 
+
+---- ---- ------
+
+-- object:keysOf(...) - finds the keys of one or more values in a source table
+
+object.keysOf = function(self,...)
+ return _findEntries(self,"keys",...)
+end
+
+---- ---- ------
+
+-- object:hasKeys(...) - determines if a source table has one or more keys
 
 object.hasKeys = function(self,...)
  if not self or type(self) ~= "table" then return false end
  for i = 1, select("#",...) do
   if not self[select(i,...)] then return false end
- end return true end
-        
-object.indexies = function(self)
-  return unpack(self,1,#self)
+  end return true end
+
+---- ---- ------
+
+-- object:find(...) - finds indecies or keys of one or more values in a source table
+
+object.find = function(self,...)
+  return _findEntries(self,nil,...)
 end
-        
+
 -------- -------- -------- -------- 
--- object.first|...| -- Prefix 
--------- -------- -------- -------- 
+
+-------- -------- -------- -------- --------
+-- object.first|...| / object.last|...|
+-------- -------- -------- -------- --------
 
 object.first = function(self,count) 
   return _firstOrLast(self,1,count) 
 end -- returns: first entrie(s)
 
-object:extend("first")
-  
-object.first.IndexOf = function(self,...)
-  return _indexOf(self,false,...)
- end -- returns: vararg - indices or nils
-
--------- -------- -------- -------- 
--- object.last|...| -- Prefix
--------- -------- -------- -------- 
-
 object.last = function(self,count) 
   return _firstOrLast(self,-1,count) 
 end -- returns: last entrie(s)
 
+-------- -------- -------- -------- 
+object:extend("first")
 object:extend("last")
+-------- -------- -------- -------- 
+  
+object.first.indexOf = function(self,...)
+  return _indexOf(self,false,...)
+ end -- returns: vararg - indices or nils
+
+---- ---- ------
 
 object.last.indexOf = function(self,...)  
   return _indexOf(self,true,...)    
@@ -1439,7 +1506,7 @@ object.range = function(self,start,fin)
 end
 
 -------- -------- -------- -------- 
--- object.copy|...| -- TODO Prefix
+-- object.copy|...| -- Prefix
 -------- -------- -------- --------
 -- object.copy: replaces an object based on the memory access pointer locations at a given level for a lua data type
 -------- -------- -------- --------
@@ -1468,8 +1535,7 @@ _copy = function(self,depth)
 end -- returns: object - copy of object
 
 -------- -------- -------- --------
--- creates a copy of a table / object 
--- opt: {depth: number, meta: boolean}
+-- copy - opt: {depth: number, meta: boolean}
 ---- ---- ---- ---- ---- ---- ---- ----
 
 object.copy = function(self,opt,ext)
@@ -1498,7 +1564,7 @@ object.copy = function(self,opt,ext)
    setmetatable(copy, _copy(meta,depth)) 
   end
   
-  return copy
+  return copy -- returns: copy of table
   
 end
 
@@ -1528,31 +1594,17 @@ object.copy.deep = function(self) -- Creates a deep copy of object table and met
 end -- returns: object - copy of object
 
 -------- -------- -------- -------- 
-
---object.copy:Keys() object.copy:Hash() object.copy:Indexies() object.copy:Meta()
-
--------- -------- -------- -------- 
-
---[[object:ext():prefix().copy = function(self,layers,layersM) -- 
-local meta,out,rep = getmetatable(self),{},1
-end
-
-object:copy(0,0)
-object.copy:Keys() object.copy:Hash() object.copy:Indexies() object.copy:Meta()
-]]
-
--------- -------- -------- -------- 
 -- Object Status / Configuration Methods
 -------- -------- -------- -------- 
 
-object.inverseIndexies = function(self) -- Inverses numerical indexies of array
+object.inverse = function(self) -- Inverses numerical indexies of array
   local pos = 0 for i = #self,1,-1 do i = i + pos self:insert(pos + 1, self:remove(i)) 
   pos = pos + 1 end  return self
 end
 
-object.inverse = object.inverseIndexies
-
----------- --------
+---------- -------- ----------
+object.inverseIndexies = object.inverse
+---------- -------- ----------
 
 object.concat = function(self,sep) -- Concantinates table indexies
     
@@ -1577,12 +1629,14 @@ object.concat = function(self,sep) -- Concantinates table indexies
  end -- returns: (string) - table indexes converted into a string
 
 ---------- -------- ----------
+object.cat = object.concat
+---------- -------- ----------
 
 -- Gets objects' __type values or data type
 
 object.type = function(self) 
-    if not self then return error("Invalid argument no.1 to object.type().",2) end
-    local meta = getmetatable(self) if meta and meta.__type then return meta.__type 
+  if not self then return error("Invalid argument no.1 to object.type().",2) end
+  local meta = getmetatable(self) if meta and meta.__type then return meta.__type 
     else return type(self) end 
 end -- returns: type string of object
 
@@ -1603,9 +1657,9 @@ object.is = function(self,...)
   return true
 end
 
+-------- -------- -------- -------- 
 object:extend("is")
-
----- -- ---- ---- -- ----
+-------- -------- -------- -------- 
 
 -- TODO - this should either be lazy load or dynamic cache as objects are built rather than created each time  ...
 
@@ -1628,7 +1682,7 @@ local function _getProtoChain(self) -- helper: builds prototype reference table 
 return protos end  --> returns: (table) 
 -- {[obj]:true, [obj]:true, 'list':{...}}
 
----- -- ---- ---- -- ----
+-------- -------- -------- -------- 
 
 -- Tests if a data value is an instance of another object instance
 
@@ -1668,7 +1722,7 @@ return true end
 -- Tests if an object is subclass / instance of another object or if a given data value is a certain lua / object type
 
 object.is.typeOf = function(self,...) 
-  
+
  local count = select("#",...)
  if not self then return false end
     
@@ -1700,22 +1754,15 @@ object.is.typeOf = function(self,...)
     
 end
 
----- -- ---- ---- -- ----
-
---[[
+-- Tests if a data value is contained inside one or more data structures (shallow)
 
 object.is.containedIn = function(self,...)
- local count = select("#",...)
-  
- for i = 1,count do
-    
- end
-  
- return true -- returns: true by default
-end
-
--- ]]
-
+ local contains = object.contains 
+ local count,arg = select("#",...)
+ for i = 1,count do arg = select(i,...)
+  if not contains(arg,self) then 
+   return false end end 
+ return true end -- returns: true by default
 
 ----- ------ ------- -------- ---------
 -- [:toString] - pretty print data
@@ -1788,10 +1835,14 @@ object.toString = function(self,opt)
     
 end
 
+-------- -------- -------- -------- 
 object:extend("toString")
+-------- -------- -------- -------- 
 
 ---- ---- ---- ----
 -- (__tostring) - sets default behavior for  converting an object instance to a string
+
+-- TBD - Change tostring.config to proxy?
 
 object.toString.config = function(self,opt)
 
@@ -1826,11 +1877,13 @@ end
 
 ---------- -------- ----------
 -- Note: This does not currently work inside an object scope -- WIP
+---------- -------- ----------
 object.tostring = object.toString
 ---------- -------- ----------
 
 ----- ------ ------- -------- --------
 -- Access instance metatables and super classes / prorotypes
+----- ------ ------- -------- --------
 
 object.meta = function(self) -- Creates object reference to metatable
   local meta = getmetatable return meta(self)
@@ -1843,20 +1896,17 @@ object.super = function(self) -- Returns super class / prototype of object
 object.prototype = object.super 
 object.proto = object.super
 
-
----- ------ ----- --- ------ -----
--- ::WIP - begin:: - (unstable) --- --- --->
------ ------ --- ----- ------ ----
-
+----- ------ ------- -------- --------
 -- Binding Methods
+----- ------ ------- -------- --------
 
 -- TBD - Binding to a super which is already part of an object should do nothing. Binding a table to an object should do what? binding an object to an object with the same super should make a multiple inherited object and change the bindee object to this object. The bindees super doesnt directly become the object which it is bound to
 
 object.bind = function(self,...)
-    
-    if _isObject(self) then return self
-    else return object(self) end
-    
+  
+  if _isObject(self) then return self
+  else return object(self) end
+  
 return end
 
 -- object:bindTo(...)
@@ -1869,23 +1919,30 @@ return end
 -- vararg - Release object bindings from multiple inheritence / supers
 
 object.release = function(self,...)
-    
-    if not self then
-    return error("Invalid argument no.1 to object.release().",2) end
-    local format = type(self)
-    if format ~= "table" or _isObject(self) == false
-    then return self end
-    
-    setmetatable(self,nil)
-    return self
-    
+  
+  if not self then
+  return error("Invalid argument no.1 to object.release().",2) end
+  local format = type(self)
+  if format ~= "table" or _isObject(self) == false
+  then return self end
+  
+  setmetatable(self,nil)
+  return self
+  
 end
 
+---------- -------- ----------
 object.unbind = object.release
+---------- -------- ----------
 
 -- object:releaseFrom(...)
 
----------- -------- ----------
+----- ------ ------- -------- --------
+
+
+---- ------ ----- --- ------ -----
+-- ::WIP - begin:: - (unstable) --- --- --->
+----- ------ --- ----- ------ ----
 
 --[[
 
@@ -2217,6 +2274,10 @@ end
 ---- ------ ----- --- ------ -----
 -- ::WIP end:: - (unstable) --- --- --- (*)
 ----- ------ --- ----- ------ ----
+
+
+
+
 
 ------------ ------------ ------------ 
 -- [debug] error handler / method checks
