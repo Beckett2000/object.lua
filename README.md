@@ -16,7 +16,136 @@ print("Hello object!")
 
 ------ ------ ------ ------
 This class has a collection of methods and functionality which could be used to build and debug code when working in Lua. There are also certain structures which can make code structures feel like other scripting languages.
+
+One of the goals with writing this class of methods is to provide more functions / methods to apply to the lua base classes. The :ext() is meant to help with dot or colon syntax chaining, while the inheritence is meant to help extend classes. Logging is meant to help with the debug process such that at any level of the code chain a table representation could potentially be expanded.
 ------ ------ ------ -----
+
+```lua
+
+getTestClass = function()
+  
+   ------- ------ ----- ------ ------- >>
+   -- Object class declarations ...
+  
+   local baseObject = object()
+  
+   ------ ---- ------ ---- ------ ---- 
+  
+   baseObject.list = function(self)
+    return self:indexies()
+   end
+  
+   ------ ---- ------ ---- ------ ----  
+   baseObject:ext("list") 
+   ------ ---- ------ ---- ------ ----
+     
+   baseObject.list.numbers = function(self)
+
+    local numbers = object()
+    for _,index in pairs({self:indexies()}) do
+     if type(index) == "number" then
+      numbers:push(index) end end
+     return numbers
+  
+   end 
+  
+   baseObject.list.strings = function(self)
+    
+     local strings = object()
+     for _,index in pairs({self:indexies()}) do
+       if type(index) == "string" then
+        strings:push(index) end end
+      return strings
+    
+   end
+  
+   ------ ---- ------ ---- ------ ----
+   local list = baseObject.list
+   ------ ---- ------ ---- ------ ----
+   list:extend("numbers")
+   ------ ---- ------ ---- ------ ----
+  
+   -- (helper) - list even or odd indexies
+   local function _evenOrOdd(self,even)
+     
+    local numbers = self.list:numbers()
+    local numberList = object()
+    for i = 1,#numbers do
+     local number = numbers[i]
+     if number % 2 == (even and 0 or 1) then
+       numberList:push(number)
+     end end    
+    return numberList
+    
+  end
+  
+  ---- ---- ----
+  
+  list.numbers.even = function(self)
+    return _evenOrOdd(self,true)  
+   end
+  
+  list.numbers.odd = function(self)
+    return _evenOrOdd(self,false)  
+  end
+  
+  
+  ------- ------ ----- ------ ------- >>
+  
+  return baseObject -- returns: test object 
+  
+end
+
+```
+
+```lua
+
+testObject = function()
+  
+  local sampleObject = {"a",44,"b",a=4,22,"c","d",1,2,3,4,5,"e" 
+  ,3.14159,"ff"}
+  
+  local testClass = getTestClass()
+  
+  local test = testClass(sampleObject)
+  
+  test:extend("unshift")
+  test.unshift.twice = function(self,...)
+    for i = 1,2 do self:unshift(...) end
+    return self 
+  end
+  
+  test:push(343,357):unshift(547)
+  test.unshift:twice("foo","bar")
+  
+  print(test,testClass:tostring("v"))
+  
+  print(test.listnumbers:odd())
+  
+  print(test.list.numbers.self) -- self pointer for proxy :ext() object
+
+end
+
+```
+
+------ ------ ------ ------
+
+`object.ext / object.extend` - Object Extensions
+
+
+```
+-- object:ext("name") -> object.name 
+-- object:name.value = ??
+-- object.name.value:ext("otherName")
+-- object.name.value.otherName = ?? ...
+
+-- local someObject = object()
+
+-- someObject inherits from object (base class) and ":exts" allow for dot / colon chaining back to the self object (someObject)
+
+```
+
+------ ------ ------ ------
 
 Custom Object Syntax
 
