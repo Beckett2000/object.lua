@@ -1,10 +1,6 @@
 object.lua
 ==========
 
------- ------ ------ ------
-Object Oriented Lua Programming
------- ------ ------ ------
-
 ```
 Constructor: object() / object.new()
 ```
@@ -18,6 +14,7 @@ print("Hello object!")
 This class has a collection of methods and functionality which could be used to build and debug code when working in Lua. There are also certain structures which can make code structures feel like other scripting languages.
 
 One of the goals with writing this class of methods is to provide more functions / methods to apply to the lua base classes. The :ext() is meant to help with dot or colon syntax chaining, while the inheritence is meant to help extend classes. Logging is meant to help with the debug process such that at any level of the code chain a table representation could potentially be expanded.
+
 ------ ------ ------ -----
 
 ```lua
