@@ -14,7 +14,7 @@ print("Hello object!")
 
 ------ ------ ------ ------
 
-One of the goals with writing this class of methods is to provide more functions / methods to apply to the lua base classes. The :ext() is meant to help with dot or colon syntax chaining, while the inheritence is meant to help extend classes. Logging is meant to help with the debug process such that at any level of the code chain a table representation could potentially be expanded.
+One of the goals with writing this class of methods is to provide more functions / methods to apply to the lua base classes. The `:ext()` is meant to help with dot or colon syntax chaining, while the inheritence is meant to help extend classes. Logging is meant to help with the debug process such that at any level of the code chain a table representation could potentially be expanded.
 
 ------ ------ ------ -----
 
