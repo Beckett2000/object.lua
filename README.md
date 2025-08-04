@@ -22,6 +22,8 @@ One of the goals with writing this class of methods is to provide more functions
 
 ```lua
 
+-- Example of a pseudo class using object and :ext(?
+
 getTestClass = function()
   
    ------- ------ ----- ------ ------- >>
@@ -99,6 +101,8 @@ end
 ```
 
 ```lua
+
+-- Tests the pseudo class code ...
 
 testObject = function()
   
