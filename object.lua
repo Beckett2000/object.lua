@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.10 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-03-25)
+-- object.lua - 3.12 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-04-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -98,7 +98,7 @@ local _implicitSelfObj = nil
 ------------ ------------ ------------ 
 -- Private method declarations
 ------------ ------------ ------------ 
-local handleToString, _objSerialDescriptor 
+local _handleToString, _objSerialDescriptor 
 local _errorHandler, _canFunctionRun
 ------------ ------------ ------------ 
 local _isObject, _firstOrLast, _indexOf
@@ -187,298 +187,6 @@ local _tostringSettings = {
     
 }
 
------------- ------------ ------------ 
-
--- [__tostring] handler for opject instances. Also invoked with printing options by calling object.toString on any data type (see object.toString)
-
-handleToString = function(value,opt)
-
-    local concat,unpack = 
-     table.concat,table.unpack
-  
-    local isObject = _isObject(value)
-    local handleStr,objStr = handleToString, _objSerialDescriptor
-    
-    local settings = object.copy(_tostringSettings)
-  
-   ---- --- ---- --- ---- --- ----
-  
-   local self, meta = value
-   local entries,value = {} 
-   local formatK,formatV,isObjectV
-
-   -- when an object with __tostring config settings is handled, the config is in the object's data store  
-    
-   if isObject then
-    local data = getDataStore(self,false)
-    if data and data.tostring then
-      settings = data.tostring    
-    end end
-  
-   ---- --- ---- --- ---- --- ----
-   -- options to the tostringHandler
-    
-   settings.data.indents = 1
-   settings.data.nested = false
-    
-   ---- --- ---- --- ---- --- ----
-   -- [opt] - passed in options 
-   
-   if opt and type(opt) == "table" then
-    
-    if opt.offsets ~= nil and type(opt.offsets) == "boolean" then
-     settings.offsets = opt.offsets end
-    if opt.lengths ~= nil and type(opt.lengths) == "boolean" then
-     settings.lengths = opt.lengths end
-        
-    settings.depth = opt.depth and type(opt.depth) == "number" and floor(abs(opt.depth)) or settings.depth
-        
-    settings.style = opt.style and (opt.style == "block" or opt.style == "vertical") and opt.style or settings.style
-        
-    settings.spacer = opt.spacer and type(opt.spacer) == "string" and opt.spacer or settings.spacer
-    
-    ---- --- ---- --- ---- --- ----
-    -- [opt.data] - recursive call data
-        
-    if opt.data then
-       
-      local indents = opt.data.indents
-      if indents then
-      settings.data.indents =     
-        floor(abs(opt.data.indents))
-      end
-            
-      settings.data.nested = opt.data.nested      
-        
-    end
-         
-   end   
-    
-   ---- --- ---- --- ---- --- ----
-   -- settings to use for string gen.
-    
-   local style = settings.style
-   local spacer = settings.spacer 
-    
-   local useOffsets = settings.offsets
-   local depth = settings.depth
-   local override = settings.override
-    
-   local indents = settings.data.indents
-   local nested = settings.data.nested
-    
-   ---- --- ---- --- ---- --- ----
-
-   local descriptor = type(self)
-   if descriptor == "table" then descriptor = objStr(self,settings) end
-    
-   ---- --- ---- --- ---- --- ----
-   -- (depth) data value stringification
-   -- adds string data for leveles of nested tables. Defalts to level 1
-    
-   if depth == 0 then
-    return concat{"(",descriptor,")"}
-   end
-    
-   ---- --- ---- --- ---- --- ----
-   -- (sort) - sort the list of indexies / keys for the tosteing display
-  
-   local list = {string = {}, number = {}, table = {}, ["function"] = {}}
-   
-   local valueType
-   for key,val in pairs(self) do
-    if val then 
-     table.insert(list[type(key)],key)
-   end end
-    
-   table.sort(list.string)
-   table.sort(list.number)
-
-   local sortList
-   sortList = function(key)
-    for i = 1, #list[key] do
-     table.insert(list,list[key][i])     
-    end list[key] = nil
-    return sortList
-   end
-   
-   sortList("number")("string")("table")("function") --> list: index/key order
-    
-   ---- --- ---- --- ---- --- ----
-    
-   for i = 1,#list do 
-        
-    local key,val = list[i],self[list[i]]
-    formatK,formatV = type(key),type(val)  
-    key,notation = formatK == "number" and key < 10 and "0"..key or key
-        
-    if formatV == "table" then
-      meta,isObjectV = getmetatable(val), _isObject(val)
-    else meta,isObjectV = nil,false end
-        
-    ---- --- ---- --- ---- --- ----
-    -- (sub level) table entry notation
-    
-    -- shows function() pointers  
-    if formatV == "function" then
-     notation = useOffsets and tostring(val) or type(val)
-     value = concat{"(",notation,")"}
-    
-    -- shows {table} / {object} pointers
-    elseif formatV == "table" then
-            
-     if depth <= 1 then
-      value = concat{"(", objStr(val,settings),")"}
-                
-     else -- shows {sub tables} (level > 1)
-      local options = object.copy(settings) 
-      options.depth = depth + 1
-      options.data.indents = indents + 1   
-      options.data.nested = true 
-      value = handleStr(val,options)     
-     end
-            
-    -- annotate "strings"
-    elseif formatV == "string" then value = concat{'"',val,'"'} else value = tostring(val) end 
-   
-    local padding = object{}
-    if style == "vertical" then 
-     padding:push("\n",spacer)
-     for i = 1,indents do
-      padding:push(spacer)
-     end
-    end
-
-   -- formats key / index display    
-   local keyForm = object{padding:concat()}
-        
-   if formatK == "number" then 
-    keyForm:push(tostring(key))
-   elseif formatK == "function" then
-    local str = useOffsets and tostring(key) or type(key)
-    keyForm:push('[(',str,')]')
-   elseif formatK == "table" then 
-    local str = objStr(key,settings)
-    keyForm:push('[(',str,')]')    
-             
-   elseif formatK == "string" then
-    local varName = "^[%a_][%w_]*$"
-    if key:match(varName) then
-     keyForm:push(key)  
-    else keyForm:push('["',key,'"]') end
-         
-   else keyForm:push(tostring(key)) end
-   keyForm:push(":",value,"")  
-   
-   -- shows [key:value] pairs  
-   local notation = keyForm:concat()
-   table.insert(entries,notation)    
-        
-   end
-
-   ---- --- ---- --- ---- --- ----
-   -- output to toString
-    
-   local padding = object{}
-   if style == "vertical" then 
-    padding:push("\n")
-    if nested then
-     for i = 1,indents do
-      padding:push(spacer)
-    end end
-   end
-    
-   return concat{"(",descriptor,"):{", concat(entries,", "), padding:concat(), "}"}
-    
-   ---- --- ---- --- ---- --- ----
-    
-end --> returns: serial descriptor string
-
------------- ------------ ------------ 
-
--- helper: gets a short string notation for object instances for the toStringHandler
-
-_objSerialDescriptor = function(obj,opt)
-    
-  if not _canFunctionRun { 
-   method = "_objSerialDescriptor",
-   types = {"table"}, 
-   self = obj } then
-    return tostring(obj) end
-    
-  ------- ------- ------- ------- ---
-    
-  local concat,getmetatable,setmetatable = table.concat,getmetatable,setmetatable
-    
-  local self = obj
-  local meta,descriptor
-  local isObject = _isObject(self)
-
-  local opt = opt and opt or _tostringSettings
-    
-  ------- ------- ------- ------- ---
-  local offsetNotation = opt.offsets
-  local showLengths = opt.lengths
-  ------- ------- ------- ------- ---
-    
-  local meta,descriptor = getmetatable(self), not isObject and tostring(self) or ""
-  local type,metaType = not isObject and type(self) or object.type(self), type(meta)
-    
-  ------- ------- ------- ------- ---
-  local natStr = meta and meta.__tostring
-  local sep = offsetNotation and ": " or ""
-    
-  -- adds length str -> i.e table[2]  
-  local length = showLengths and concat{"[",#self,"]"} or ""
-    
-  -- adds offset notation -> 0x000000
-  local offset = ""
-    
-  ------- ------- ------- ------- ---
-    
-  if offsetNotation then
-   
-   local str = descriptor
-   if not isObject and (metaType ~= "table" or metaType == "table" and meta.__tostring == nil) then
-     offset = string.match(str,"0x%x+")  
-        
-   else  
-            
-    ------- ------- -------
-    if natStr then 
-     setmetatable(self,nil) end
-    ------- ------- -------
-
-    str = tostring(self)
-    offset = string.match(str,"0x%x+")
-        
-    ------- ------- -------
-    if natStr then 
-     setmetatable(self,meta) end
-    ------- ------- -------
-        
-  end end
-        
-  ------- ------- -------
-  -- shows the native __tostring output for tables passed into object.toString
-    
-  if natStr and meta.__tostring ~= handleToString then
-        
-   local status,str = pcall(tostring,self)  
-          
-   if status == false then _errorHandler{error = "pcall", method = "handleToString", message = str} end
-    local sep = sep == ":" and " " or ": "
-    natStr = status == true and concat{sep,'{ __tostring = "',str,'" }'} or ""
-        
-  else natStr = "" end
-    
-  ------- ------- -------
-    
-  descriptor = concat{type,length,sep,offset,natStr}
-    
-  return descriptor --> returns: (string)
-    
-end
 
 ------------ ------------ ------------ 
 -- (top level) helpers for building object
@@ -650,7 +358,7 @@ local function hasExtensionLayer(self) -- (private) determines if table has ext 
 
 local function getExtensionIndex(self)
   local hasIndex,exIndex = hasExtensionLayer(self)
-  if not hasIndex then exIndex = initExtensionayer(self) end
+  if not hasIndex then exIndex = initExtensionLayer(self) end
   return exIndex 
 end
 
@@ -728,30 +436,13 @@ local function getBackReference(self)
         
 end  -- returns: alias root target
 
-------------> ------------> ------------> 
-object._ext = {} ---> ------> -------->
-------------> ------------> ------------> 
 
-local extMeta = { -- .ext() is a dynamic module
-    
- __type = "object._ext",
-    
- __tostring = function(self) -- reports details when converted to string
-  local names,layer,name = {},self 
-  while layer do for k,v in pairs(layer) do 
-   table.insert(names,tostring(k)..":("..getmetatable(v(object)).__type..")") end 
-   layer = getmetatable(layer).__proto end table.sort(names)
-  return "(ext cache):{"..table.concat(names,", ").."}" end,
-    
-  __index = function(ext,key) return ext(getBackReference(ext))[key] end, -- object.ext:method()
-    
-  ------------- -------------
-    
-  __call = function(ext,obj)  -- invoked when calling object:ext()
-   if not obj then error("invalid arg. no.1 (lua table) to object.ext().",2) 
-   return end 
+------------ ------------ ------------
+-- (private) ::proxy:: - creates a proxy object for extensions and tables/objects
 
-   local proxy,meta = {},{ -- ::proxy:: -> returned by object:ext()   
+local _proxy = function(ext,obj)
+  
+  local meta = { 
             
     __newindex = function(self,keys,value) -- [newindex] object.ext[key] set / object[key] unwrapped
         
@@ -915,8 +606,12 @@ local extMeta = { -- .ext() is a dynamic module
                                 
           -- returns: prefix self ref.
           if key == "self" then         
-           return meta.__self               
-                                               
+           return meta.__self
+                
+          elseif key == "tostring" or key == "toString" then return 
+           function(options) return _handleToString(pointer, options) 
+           end
+                
           -- calling prefix.extend                 
           elseif key == "extend" or key == "ext" then
                                     
@@ -1054,20 +749,46 @@ local extMeta = { -- .ext() is a dynamic module
        return ext[key] end
             
      } -- returns: pointer to method in entry
-        
-    setmetatable(proxy,meta) 
-        
- return proxy end } -- returns: proxy table 
+  
+   local proxy = {} setmetatable(proxy,meta) 
+   return proxy -- returns: proxy table 
+
+end
+
+------------> ------------> ------------> 
+object._ext = {} ---> ------> -------->
+------------> ------------> ------------> 
+
+local extMeta = { -- .ext() is a dynamic module
+    
+ __type = "object._ext",
+    
+ __tostring = function(self) -- reports details when converted to string
+  local names,layer,name = {},self 
+  while layer do for k,v in pairs(layer) do 
+   table.insert(names,tostring(k)..":("..getmetatable(v(object)).__type..")") end 
+   layer = getmetatable(layer).__proto end table.sort(names)
+  return "(ext cache):{"..table.concat(names,", ").."}" end,
+    
+ __index = function(ext,key) return ext(getBackReference(ext))[key] end, -- object.ext:method()
+    
+ __call = function(ext,obj)  -- invoked when calling object:ext()
+    
+  if not obj then error("invalid arg. no.1 (lua table) to object.ext().",2) 
+  return end 
+    
+  return _proxy(ext,obj) 
+ end -- returns: proxy table 
+  
+} 
 
 -- Sets up metatable for object.ext
 setmetatable(object._ext,extMeta)
 
 ---------- ---------- ---------- -----
--- Primitive Object Constructor -> object:new() | object()
+-- ::object:new():: | ::object():: -> primitive object constructors
 
 -- The new metamethods for an object subclass are passed at the time of initialization. If metatable elements are detected, they are removed from the objects methods and added to its metatable. The imput object as well as the output object retured can be used to add new methods and values to a class, but new metamethods will not be detected after initial initialization.
-
--- object.init = function(self) end -- Called upon object initiation
 
 object.new = function(super,self) -- (object) - base constructor 
     
@@ -1106,8 +827,12 @@ object.new = function(super,self) -- (object) - base constructor
 return self end -- returns: new object instance
 
 ---------- ---------- ----------
+-- ::object.init:: - an optional '.init()' function can be declared which will be called each time an object is instantiation
 
--- object.extend / :ext() - creates a extension on a key so that it can function such as object.insertFirst | object.insert.first | object.insert:First etc. where the 'ext' is object.insert
+-- object.init = function(self) end -- Called upon object instantiation
+
+---------- ---------- ----------
+-- ::object.extend:: / :ext() - creates a extension on a key so that it can function such as object.insertFirst | object.insert.first | object.insert:First etc. where the 'ext' is object.insert
 
 object.extend = function(self,key)
 
@@ -1154,6 +879,16 @@ end
 ----- ----> ----- ---- -----> ----
 object.ext = object.extend ----->
 ----- ----> ----- ---- -----> ----
+
+---------- ---------- ----------
+
+-- ::object.proxy:: - (TBA) creates a proxy to a table or object which takes on the 'self' of a referenced object and allows for access control. Access 'r' (read) 'w' (write) or 'rw' (read and write) - defaults to 'rw'
+
+object.proxy = function(self,access)
+  
+end
+
+---------- ---------- ----------
 
 -------------------- -------------------- --------------------     
 -- (_.insert, _.remove) - Prefix Block Extensions
@@ -1851,63 +1586,136 @@ object.type = function(self)
     else return type(self) end 
 end -- returns: type string of object
 
----------- -------- ----------
 
--- Tests if an object is subclass / instance of another object or a data value is a certain type
+-------- -------- -------- -------- 
+-- object.is|...| -- Prefix
+-------- -------- -------- --------
+-- object.is: determins equality and types of a data value compared against others
+-------- -------- -------- --------
 
-object.isTypeOf = function(self,...) 
+object.is = function(self,...)
+  if not self then return false end
+  local count = select("#",...)
+  if count == 0 then return false end
+  for i = 1,count do
+   if self ~= select(i,...) then 
+    return false end end
+  return true
+end
+
+object:extend("is")
+
+---- -- ---- ---- -- ----
+
+-- TODO - this should either be lazy load or dynamic cache as objects are built rather than created each time  ...
+
+local function _getProtoChain(self) -- helper: builds prototype reference table for objects
+  
+  local unshift = object.unshift
+  
+  local protos,list = {},{}
+  local proto = self:proto()
+  
+  while(proto) do  
+    unshift(list,proto); protos[proto] = true
+    if proto == object then break end
+    proto = proto:proto()     
+  end
+  
+  -- ordered list of proto objects
+  protos.list = list
+  
+return protos end  --> returns: (table) 
+-- {[obj]:true, [obj]:true, 'list':{...}}
+
+---- -- ---- ---- -- ----
+
+-- Tests if a data value is an instance of another object instance
+
+object.is.instanceOf = function(self,...)
+  
+  local count = select("#",...)
+  if not self or count == 0 then
+  return false end
+  
+  local _type = type(self)
+  if _type ~= "string" and _type ~= "table" then return false end
+  local protoChain = false
+  
+  local isObject = _isObject(self) == true 
+  
+  for i = 1, select("#",...) do
     
-    local count = select("#",...)
-    if not self then return false end
+    local arg = select(i,...)
+    if _type == "string" and arg ~= string then 
+    return false end 
     
-    local baseType,argStep = type(self), 1
-    local objType = baseType == "table" and self.type and self:type()
-    local arg = select(argStep,...)
+    if self == arg or isObject and arg == object then -- implicit continue
+    elseif isObject then
+      if not _isObject(arg) then
+      return false end
+      
+      -- cheates proto chain reference
+      if not protoChain then
+      protoChain = _getProtoChain(self) end
+      if not protoChain[arg] then 
+      return false end end
     
-    local objClass = object:proto()
-    local isOfType = true
+  end
+  
+return true end
+
+-- Tests if an object is subclass / instance of another object or if a given data value is a certain lua / object type
+
+object.is.typeOf = function(self,...) 
+  
+ local count = select("#",...)
+ if not self then return false end
     
-    while true do
-        
-        local argType = type(arg)    
-        
-        -- (object) - object pointer
-        if argType == "table" and baseType == "table" and _isObject(self) and _isObject(self) == true and _isObject(arg) then
-            
-            local proto = self:proto()
-            local match = false
-            
-            if arg == object then
-                match = true        
-                
-            else
-                while proto ~= nil do
-                    if proto == arg then match = true break end  
-                    proto = proto:proto()   
-                end     
-            end
-            
-            isOfType = match and true or false
-            
-        -- (string) - object:type() or type()
-        elseif argType == "string" then
-            if baseType == arg or objType == arg then match = true
-            elseif baseType ~= argType and objType ~= argType then 
-            return false end  
-        end
-        
-        argStep = argStep + 1, true
-        if argStep > count then break end
-        arg = select(argStep,...)
-        
-    end
+ local _type = type(self)
+ local objType = baseType == "table" and self.type and self:type()
+ local isObject = _isObject(self) == true 
+  
+ local arg,step = select(1,...), 1
+ local isOfType = true
+  
+ while true do
+     
+  local argType = type(arg)       
+  if arg == self then isOfType = true 
+  elseif arg == nil then 
+   isOfType = false break 
     
-    return isOfType 
+  -- (string) - object:type() or type() 
+  elseif argType == "string" then
+   if _type ~= arg and objType ~= arg then isOfType = false break end     
+   elseif isObject and not self:isInstanceOf(arg) then
+    isOfType = false break end
+    
+  step = step + 1 
+  if step > count then break end
+  arg = select(step,...) end
+    
+  return isOfType 
     
 end
 
-object.isInstanceOf = object.isTypeOf
-object.isOfType = object.isTypeOf
+---- -- ---- ---- -- ----
+
+--[[
+
+object.is.containedIn = function(self,...)
+ local count = select("#",...)
+  
+ for i = 1,count do
+    
+ end
+  
+ return true -- returns: true by default
+end
+
+-- ]]
+
 
 ----- ------ ------- -------- ---------
 -- [:toString] - pretty print data
@@ -1976,7 +1784,7 @@ object.toString = function(self,opt)
     
   local meta = getmetatable(self)
   if meta and meta.__tostring and not opt then return tostring(self) end
-  return handleToString(self,opt)
+  return _handleToString(self,opt)
     
 end
 
@@ -2006,7 +1814,6 @@ object.toString.config = function(self,opt)
   ---------- ---------- ---------- ------
   local settings = getToStringSettings()
   ---------- ---------- ---------- ------
-  
     
   for k,v in pairs(opt) do
     local setting = settings[k]
@@ -2036,7 +1843,10 @@ object.super = function(self) -- Returns super class / prototype of object
 object.prototype = object.super 
 object.proto = object.super
 
------ ------ ------- -------- --------
+
+---- ------ ----- --- ------ -----
+-- ::WIP - begin:: - (unstable) --- --- --->
+----- ------ --- ----- ------ ----
 
 -- Binding Methods
 
@@ -2404,6 +2214,10 @@ elseif _VERSION == "Lua 5.2" or _VERSION == "Lua 5.3" or _VERSION == "Lua 5.4" t
     
 end
 
+---- ------ ----- --- ------ -----
+-- ::WIP end:: - (unstable) --- --- --- (*)
+----- ------ --- ----- ------ ----
+
 ------------ ------------ ------------ 
 -- [debug] error handler / method checks
 ------------ ------------ ------------ 
@@ -2459,6 +2273,301 @@ _canFunctionRun = function(options)
   return true
     
 end --> boolean - can method run
+
+------------ ------------ ------------ 
+-- __tostring handler - converts data values (namely tables) to readable strings
+------------ ------------
+-- note: also invoked with printing options by calling object.toString on any data type (see object.toString)
+------------ ------------ ------------ 
+
+_handleToString = function(value,opt)
+
+    local concat,unpack = 
+     table.concat,table.unpack
+  
+    local isObject = _isObject(value)
+    local handleStr,objStr = _handleToString, _objSerialDescriptor
+    
+    local settings = object.copy(_tostringSettings)
+  
+   ---- --- ---- --- ---- --- ----
+  
+   local self, meta = value
+   local entries,value = {} 
+   local formatK,formatV,isObjectV
+
+   -- when an object with __tostring config settings is handled, the config is in the object's data store  
+    
+   if isObject then
+    local data = getDataStore(self,false)
+    if data and data.tostring then
+      settings = data.tostring    
+    end end
+  
+   ---- --- ---- --- ---- --- ----
+   -- options to the tostringHandler
+    
+   settings.data.indents = 1
+   settings.data.nested = false
+    
+   ---- --- ---- --- ---- --- ----
+   -- [opt] - passed in options 
+   
+   if opt and type(opt) == "table" then
+    
+    if opt.offsets ~= nil and type(opt.offsets) == "boolean" then
+     settings.offsets = opt.offsets end
+    if opt.lengths ~= nil and type(opt.lengths) == "boolean" then
+     settings.lengths = opt.lengths end
+        
+    settings.depth = opt.depth and type(opt.depth) == "number" and floor(abs(opt.depth)) or settings.depth
+        
+    settings.style = opt.style and (opt.style == "block" or opt.style == "vertical") and opt.style or settings.style
+        
+    settings.spacer = opt.spacer and type(opt.spacer) == "string" and opt.spacer or settings.spacer
+    
+    ---- --- ---- --- ---- --- ----
+    -- [opt.data] - recursive call data
+        
+    if opt.data then
+       
+      local indents = opt.data.indents
+      if indents then
+      settings.data.indents =     
+        floor(abs(opt.data.indents))
+      end
+            
+      settings.data.nested = opt.data.nested      
+        
+    end
+         
+   end   
+    
+   ---- --- ---- --- ---- --- ----
+   -- settings to use for string gen.
+    
+   local style = settings.style
+   local spacer = settings.spacer 
+    
+   local useOffsets = settings.offsets
+   local depth = settings.depth
+   local override = settings.override
+    
+   local indents = settings.data.indents
+   local nested = settings.data.nested
+    
+   ---- --- ---- --- ---- --- ----
+
+   local descriptor = type(self)
+   if descriptor == "table" then descriptor = objStr(self,settings) end
+    
+   ---- --- ---- --- ---- --- ----
+   -- (depth) data value stringification
+   -- adds string data for leveles of nested tables. Defalts to level 1
+    
+   if depth == 0 then
+    return concat{"(",descriptor,")"}
+   end
+    
+   ---- --- ---- --- ---- --- ----
+   -- (sort) - sort the list of indexies / keys for the tosteing display
+  
+   local list = {string = {}, number = {}, table = {}, ["function"] = {}}
+   
+   local valueType
+   for key,val in pairs(self) do
+    if val then 
+     table.insert(list[type(key)],key)
+   end end
+    
+   table.sort(list.string)
+   table.sort(list.number)
+
+   local sortList
+   sortList = function(key)
+    for i = 1, #list[key] do
+     table.insert(list,list[key][i])     
+    end list[key] = nil
+    return sortList
+   end
+   
+   sortList("number")("string")("table")("function") --> list: index/key order
+    
+   ---- --- ---- --- ---- --- ----
+    
+   for i = 1,#list do 
+        
+    local key,val = list[i],self[list[i]]
+    formatK,formatV = type(key),type(val)  
+    key,notation = formatK == "number" and key < 10 and "0"..key or key
+        
+    if formatV == "table" then
+      meta,isObjectV = getmetatable(val), _isObject(val)
+    else meta,isObjectV = nil,false end
+        
+    ---- --- ---- --- ---- --- ----
+    -- (sub level) table entry notation
+    
+    -- shows function() pointers  
+    if formatV == "function" then
+     notation = useOffsets and tostring(val) or type(val)
+     value = concat{"(",notation,")"}
+    
+    -- shows {table} / {object} pointers
+    elseif formatV == "table" then
+            
+     if depth <= 1 then
+      value = concat{"(", objStr(val,settings),")"}
+                
+     else -- shows {sub tables} (level > 1)
+      local options = object.copy(settings) 
+      options.depth = depth + 1
+      options.data.indents = indents + 1   
+      options.data.nested = true 
+      value = handleStr(val,options)     
+     end
+            
+    -- annotate "strings"
+    elseif formatV == "string" then value = concat{'"',val,'"'} else value = tostring(val) end 
+   
+    local padding = object{}
+    if style == "vertical" then 
+     padding:push("\n",spacer)
+     for i = 1,indents do
+      padding:push(spacer)
+     end
+    end
+
+   -- formats key / index display    
+   local keyForm = object{padding:concat()}
+        
+   if formatK == "number" then 
+    keyForm:push(tostring(key))
+   elseif formatK == "function" then
+    local str = useOffsets and tostring(key) or type(key)
+    keyForm:push('[(',str,')]')
+   elseif formatK == "table" then 
+    local str = objStr(key,settings)
+    keyForm:push('[(',str,')]')    
+             
+   elseif formatK == "string" then
+    local varName = "^[%a_][%w_]*$"
+    if key:match(varName) then
+     keyForm:push(key)  
+    else keyForm:push('["',key,'"]') end
+         
+   else keyForm:push(tostring(key)) end
+   keyForm:push(":",value,"")  
+   
+   -- shows [key:value] pairs  
+   local notation = keyForm:concat()
+   table.insert(entries,notation)    
+        
+   end
+
+   ---- --- ---- --- ---- --- ----
+   -- output to toString
+    
+   local padding = object{}
+   if style == "vertical" then 
+    padding:push("\n")
+    if nested then
+     for i = 1,indents do
+      padding:push(spacer)
+    end end
+   end
+    
+   return concat{"(",descriptor,"):{", concat(entries,", "), padding:concat(), "}"}
+    
+   ---- --- ---- --- ---- --- ----
+    
+end --> returns: serial descriptor string
+
+------------ ------------ ------------ 
+
+-- helper: gets a short string notation for object instances for the toStringHandler
+
+_objSerialDescriptor = function(obj,opt)
+    
+  if not _canFunctionRun { 
+   method = "_objSerialDescriptor",
+   types = {"table"}, 
+   self = obj } then
+    return tostring(obj) end
+    
+  ------- ------- ------- ------- ---
+    
+  local concat,getmetatable,setmetatable = table.concat,getmetatable,setmetatable
+    
+  local self = obj
+  local meta,descriptor
+  local isObject = _isObject(self)
+
+  local opt = opt and opt or _tostringSettings
+    
+  ------- ------- ------- ------- ---
+  local offsetNotation = opt.offsets
+  local showLengths = opt.lengths
+  ------- ------- ------- ------- ---
+    
+  local meta,descriptor = getmetatable(self), not isObject and tostring(self) or ""
+  local type,metaType = not isObject and type(self) or object.type(self), type(meta)
+    
+  ------- ------- ------- ------- ---
+  local natStr = meta and meta.__tostring
+  local sep = offsetNotation and ": " or ""
+    
+  -- adds length str -> i.e table[2]  
+  local length = showLengths and concat{"[",#self,"]"} or ""
+    
+  -- adds offset notation -> 0x000000
+  local offset = ""
+    
+  ------- ------- ------- ------- ---
+    
+  if offsetNotation then
+   
+   local str = descriptor
+   if not isObject and (metaType ~= "table" or metaType == "table" and meta.__tostring == nil) then
+     offset = string.match(str,"0x%x+")  
+        
+   else  
+            
+    ------- ------- -------
+    if natStr then 
+     setmetatable(self,nil) end
+    ------- ------- -------
+
+    str = tostring(self)
+    offset = string.match(str,"0x%x+")
+        
+    ------- ------- -------
+    if natStr then 
+     setmetatable(self,meta) end
+    ------- ------- -------
+        
+  end end
+        
+  ------- ------- -------
+  -- shows the native __tostring output for tables passed into object.toString
+    
+  if natStr and meta.__tostring ~= _handleToString then
+        
+   local status,str = pcall(tostring,self)  
+          
+   if status == false then _errorHandler{error = "pcall", method = "handleToString", message = str} end
+    local sep = sep == ":" and " " or ": "
+    natStr = status == true and concat{sep,'{ __tostring = "',str,'" }'} or ""
+        
+  else natStr = "" end
+    
+  ------- ------- -------
+    
+  descriptor = concat{type,length,sep,offset,natStr}
+    
+  return descriptor --> returns: (string)
+    
+end
 
 ----- ----------- ----------- -----------
 -- [private] - below this point -- >>
@@ -2562,7 +2671,7 @@ local meta = getmetatable(object) -- Allows object class to have independent ext
 
  setmetatable(_object,{__index = object, __call = meta.__call, 
   __version = meta.version, __type = "object env", __proto = object,
-  __tostring = handleToString })
+  __tostring = _handleToString })
 
 object = _object; initExtensionLayer(object) -- updates object alias pointer
 
