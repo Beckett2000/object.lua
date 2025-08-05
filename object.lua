@@ -472,18 +472,57 @@ local _proxy = function(ext,obj)
     __index = function(extension,key) 
                 
      local ext = {} -- handles indexes to _:ext()        
-                
-      ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+      
+      ---------- ---------- ---------- 
+      -- (_ext.getter) - returns a value
+      
+      ext.getter = _extSetter(extension, function(name,method) -- (passUp) object indexer / sorter
+        return function(self)  
+        
+         local concat = table.concat  
+         ---- ---- ---- ---- ---- ----          
+         local extension,meta = {},{}
+         ---- --- ---- ----- ------ --
+          
+        local function _indexGetter(self,key)
+         local path = meta.__data.path
+         path = type(path) == "string" and path or concat(path,".")        
+          print(concat{"error: attempt to index an ext.getter (self.",path,")."}) end
+          
+        local function _getValue()
+          return method(self)
+        end
+          
+        meta = { -- extension metadata
+                            
+         __type = "ext.getter", 
+         __self = self,
+                            
+         __data = {             
+          -- stores ext name path data                              
+          path = type(name) == "string" and {name} or type(name) == "table" and name                    
+         },
+            
+         -------- ---- ------- ----
+         __index = _indexGetter,
+         __newIndex = _indexGetter,
+         -------- ---- ------- ----
+         __tostring = _getValue,
+         __call = _getValue
+         -------- ---- ------- ----
+            
+      } setmetatable(extension,meta) return extension end end )
+      
+      ---------- ---------- ---------- 
       -- [ext().prefix()] - Declare: :ext():|prefix|().name = method / :ext():|prefix|(name,method)
       -- Declare Key: :|prefix|().|key| = method / .|prefix||key| = method
       -- Call Key: object:prefix():key() / object.prefix:key() / object:|prefix||key|()     
-      ---------- ---------- ---------- ---------- ---------- ---------- ---------- ----------
+      ---------- ---------- ---------- 
                 
-      ext._prefix = _extSetter(extension, function(name,method) -- (passUp) object indexer / sorter
+      ext.prefix = _extSetter(extension, function(name,method) -- (passUp) object indexer / sorter
         return function(self)  
             
-         ---- ---- ---- ---- ---- ----
-                        
+         ---- ---- ---- ---- ---- ----          
          local extension,meta = {},{
            _isPrefix = true
          } -- --- ---- ----- ------           
@@ -495,7 +534,7 @@ local _proxy = function(ext,obj)
          meta = { -- extension metadata
                             
           __type = "ext.prefix", 
-          __self = self, -- obj
+          __self = self, 
                             
           __data = {             
             -- stores ext name path data                              
@@ -794,6 +833,7 @@ local extMeta = { -- .ext() is a dynamic module
 setmetatable(object._ext,extMeta)
 
 ---------- ---------- ---------- -----
+
 -- ::object:new():: | ::object():: -> primitive object constructors
 
 -- The new metamethods for an object subclass are passed at the time of initialization. If metatable elements are detected, they are removed from the objects methods and added to its metatable. The imput object as well as the output object retured can be used to add new methods and values to a class, but new metamethods will not be detected after initial initialization.
@@ -835,11 +875,13 @@ object.new = function(super,self) -- (object) - base constructor
 return self end -- returns: new object instance
 
 ---------- ---------- ----------
+
 -- ::object.init:: - an optional '.init()' function can be declared which will be called each time an object is instantiation
 
 -- object.init = function(self) end -- Called upon object instantiation
 
 ---------- ---------- ----------
+
 -- ::object.extend:: / :ext() - creates a extension on a key so that it can function such as object.insertFirst | object.insert.first | object.insert:First etc. where the 'ext' is object.insert
 
 object.extend = function(self,key)
@@ -872,7 +914,7 @@ object.extend = function(self,key)
     
  local target = self[key] 
  if target and callable(target) then
-  self:_ext():_prefix()[path] = target 
+  self:_ext():prefix()[path] = target 
   
   -- sets the data.prev for nested exts
   if isExtension then -- this may be moved 
@@ -884,9 +926,26 @@ object.extend = function(self,key)
         
 end
 
+---------- ---------- ----------
+
+-- ::object.ext():: (WIP) -- calling .ext() by itself creates an extension like object.extend, but it also holds custom extensions like the (getter)
+
 ----- ----> ----- ---- -----> ----
-object.ext = object.extend ----->
+object.ext = object.extend  ----->
+object:extend("ext") -- -- --
 ----- ----> ----- ---- -----> ----
+
+-- ::ext.getter:: - returns a dynamic value when a table entry is accessed
+
+object.ext.getter = function(self,key)
+  self:_ext():getter()[key] = self[key]
+end
+
+-- Potential getter changes - TBD
+
+-- This format could also be used for getters one proxies are introduced 
+-- object.someGetter = object.ext:getter(
+--  function(self) end)
 
 ---------- ---------- ----------
 
@@ -898,9 +957,9 @@ end
 
 ---------- ---------- ----------
 
--------------------- -------------------- --------------------     
--- (_.insert, _.remove) - Prefix Block Extensions
-------------------- - -------------------- --------------------     
+-------------------- --------------------      
+-- (_.insert, _.remove) - Prefix Extensions
+------------------- - --------------------      
 
 -- These prefix extensions search for the insert or remove prefix when referenced to create custom method call blocks. Using the declaration syntax, subclasses can append custom local methods to these extensions. The usage structure is below:
 
@@ -910,13 +969,13 @@ end
 -- object:_extPreix().remove = table.remove; object:_extPrefix().insert = table.insert
 
 -------------------- --------------------
--------------------- --------------------
 
 -- object.insert|...| -- These functions are used to add data to the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:insert() block call connections -> object:insert():First(values):Last(values).
 
 object.insert = table.insert
-object:extend("insert")
 
+------ ---- ------ ---- ------
+object:extend("insert") ---- ---- (*)
 ------ ---- ------ ---- ------
 
 -- inserts at the start of a table/string
@@ -1069,8 +1128,9 @@ object.insert.keysFromTable = function(self,source,overwrite) -- inserts keys fr
 -- object.remove|...| -- These functions are used to remove data from the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:remove()
 
 object.remove = table.remove
-object:extend("remove")
 
+------ ---- ------ ---- ------
+object:extend("remove") ---- ---- (*)
 ------ ---- ------ ---- ------
 
 -- removes one or more indexies from table
@@ -1265,7 +1325,7 @@ object.remove.firstIndexOf = function(self,val,...) -- removes values from their
     return unpack(out) end end
 
 object.remove.indexiesOf = function(self,...)
-    
+  
     local args = {...}
     for i = 1,#args do 
      local entry,selfLength = args[i], #self
@@ -1322,6 +1382,22 @@ object.push = object.insertLast
 object.pop = object.removeLast
 object.slice = object.removeAtIndex
 
+---- ------ ---- ---- ------ ----
+
+-- (object.splice) - behaves similarly javascript splice method.
+
+-- (index) - starting index
+-- (count) - number of elements to remove
+-- (vararg) - elements to insert after index
+
+-- for (index) and (count), if the number is  positive, then the indes is from start or end, or the element count is forward or backwards
+
+object.splice = function(self,index,count,...)
+  
+  local removed = {}
+  
+return unpack(removed) end
+
 ------- ------- ------- ------- ------- ----
 -- Querying / Search Methods
 ------- ------- ------- ------- ------- ----
@@ -1333,11 +1409,15 @@ object.slice = object.removeAtIndex
 object.countElements = function(self) -- gets number of elements in object
   local i,index = 0,next(self) while index do i = i + 1 index = next(self,index) end return i end
 
--- TODO - change .length and .size to getters
-object.length = object.countElements
-object.size = object.countElements
+-- (getters) - object.count / object.length -> returns: number of indexies and keys
 
--------- -------- -------- -------- 
+object.length = function(o) return #o end
+object.count = object.countElements
+
+------- ------- ------- -------
+object.ext:getter("count")
+object.ext:getter("length") 
+------- ------- ------- -------
 
 -- object:contains(...) - determines if one or more entries exists in a source table
 
@@ -1444,8 +1524,6 @@ object.find = function(self,...)
   return _findEntries(self,nil,...)
 end
 
--------- -------- -------- -------- 
-
 -------- -------- -------- -------- --------
 -- object.first|...| / object.last|...|
 -------- -------- -------- -------- --------
@@ -1458,22 +1536,49 @@ object.last = function(self,count)
   return _firstOrLast(self,-1,count) 
 end -- returns: last entrie(s)
 
--------- -------- -------- -------- 
-object:extend("first")
-object:extend("last")
--------- -------- -------- -------- 
+-------- -------- -------- -------- --------
+object:extend("first"); object:extend("last")
+-------- -------- -------- -------- --------
   
 object.first.indexOf = function(self,...)
   return _indexOf(self,false,...)
  end -- returns: vararg - indices or nils
 
----- ---- ------
-
 object.last.indexOf = function(self,...)  
   return _indexOf(self,true,...)    
 end -- returns: vararg - indices or nils
 
--------- -------- -------- -------- 
+-------- -------- -------- -------- --------
+
+-- TBD - Methods like this work currently, but maybe this structure could be used to filter returns from other methods ...
+
+object.first.withType = function(self,...)
+  
+  if not _canFunctionRun{ 
+    method = "object.first.withType",
+    types = {"table"},
+  self = self } then return end
+  
+  local isTypeOf = object.isTypeOf
+  for i = 1,#self do
+    if isTypeOf(self[i],...) then
+     return self[i] end end 
+end
+
+object.last.withType = function(self,...)
+  
+  if not _canFunctionRun{ 
+    method = "object.last.withType",
+    types = {"table"},
+  self = self } then return end
+
+  local isTypeOf = object.isTypeOf
+  for i = #self,1,-1 do
+    if isTypeOf(self[i],...) then
+      return self[i] end end
+end
+
+-------- -------- -------- -------- --------
 
 -- get index value range / substring of table / string values respectively
 object.range = function(self,start,fin)
@@ -1505,6 +1610,8 @@ object.range = function(self,start,fin)
     
 end
 
+-------- -------- -------- -------- --------
+
 -------- -------- -------- -------- 
 -- object.copy|...| -- Prefix
 -------- -------- -------- --------
@@ -1535,7 +1642,7 @@ _copy = function(self,depth)
 end -- returns: object - copy of object
 
 -------- -------- -------- --------
--- copy - opt: {depth: number, meta: boolean}
+-- object.copy {depth: number, meta: boolean}
 ---- ---- ---- ---- ---- ---- ---- ----
 
 object.copy = function(self,opt,ext)
@@ -1937,6 +2044,7 @@ object.unbind = object.release
 
 -- object:releaseFrom(...)
 
+----- ------ ------- -------- --------
 ----- ------ ------- -------- --------
 
 
