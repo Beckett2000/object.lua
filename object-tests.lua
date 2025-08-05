@@ -54,7 +54,7 @@ local function runTests(categories)
   
   -- run all tests - runTests("*")
   if categories == "*" then
-   categories = keys(objectTests)
+   categories = {keys(objectTests)}
      
   -- run selected tests - runTests(category)
   elseif type(categories) == "string" then categories = {categories} 
@@ -71,7 +71,7 @@ local function runTests(categories)
   for i = 1, #categories do
    local category = categories[i]
    if objectTests[category] then
-    testCount = testCount + #keys(objectTests[category])
+    testCount = testCount + #{keys(objectTests[category])}
     end end
   
   ---------- ------ ---------- ------
