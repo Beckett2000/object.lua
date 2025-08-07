@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.12 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-06-25)
+-- object.lua - 3.12 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-07-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -1398,6 +1398,12 @@ local function _getIndexies(self,index,count)
   
   local _index, _count = index, count
   
+  if index == nil and count == nil then
+    return 1, #self
+  end
+  
+  index,count = index and index or 1, count and count or 0
+  
   if index == 0 then index = 1
    count = count <= 0 and 0 or count - 1
   elseif index < 0 then
@@ -1437,6 +1443,8 @@ object.slice = function(self,index,count)
   self = self } then return end
   
   local insert,slice = table.insert, {}
+  if index ~= nil and count == nil then
+    count = math.huge end
   index,count = _getIndexies(self,index,count)
   
   if index <= #self then
@@ -1470,8 +1478,17 @@ object.splice = function(self,index,count,...)
   local removed = {} ------
   ---- ------ ---- ------
   
-  local _index, _count = index, count
+  local _index,_count = index,count
+  local spliced,len = {...}, select("#",...) 
+  
+  if index == nil and count == nil then
+   _index,_count = 1,#self end
+  if _count == nil and len == 0 then 
+   count = math.huge end 
+  
   index,count = _getIndexies(self,index,count)
+  if _count == nil and index >= #self then
+   return end
   
   if index <= #self then
    for i = 1, count do 
@@ -1479,13 +1496,18 @@ object.splice = function(self,index,count,...)
   end end
   
   ---- ------ ----
-  
-  local spliced,len = {...}, select("#",...)
+
   if index > #self then index = #self + 1 end
+  
+  if index == nil and count == nil then
+    _index,_count = 1,#self 
+  elseif _count == nil then _count = 0 end
   
   if _index < 0 then
     if _count > 0 and _count + _index >= 0 then index = #self + 1 end
   end
+  
+  ---- ------ ----
   
   for i = 1, len do
    insert(self,index, spliced[len + 1 - i])
