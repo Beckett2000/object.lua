@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.12 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-04-25)
+-- object.lua - 3.12 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-06-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -101,7 +101,8 @@ local _implicitSelfObj = nil
 local _handleToString, _objSerialDescriptor 
 local _errorHandler, _canFunctionRun
 ------------ ------------ ------------ 
-local _isObject, _firstOrLast, _indexOf
+local _isObject, _firstOrLast, _indexOf,
+ _roundNumber
 ------------ ------------ ------------
 
 ------------ ------------ ------------ 
@@ -113,18 +114,17 @@ local objectDebug = {
 }
 
 ------------ ------------ ------------ 
--- objectDebug = false
------------- ------------ ------------ 
 
 local meta = {__index = self, __type = "object class", __version = true,
 
-    __tostring = function(self) -- gives objects a tostring native behavior
-        local vals = {} for k,_ in pairs(self) do table.insert(vals,tostring(k)) end
-    table.sort(vals) return "(object baseClass):["..table.concat(vals,", ").."]" end,
+ __tostring = function(self) -- gives objects a tostring native behavior
+  local vals = {} for k,_ in pairs(self) do table.insert(vals,tostring(k)) end
+  table.sort(vals) return "(object baseClass):["..table.concat(vals,", ").."]" end,
     
-    __call = function(self,...) -- creates object class from initializer
-        return -- self.init and self:init(...) or 
-    self:new(...) end } 
+ __call = function(self,...) -- creates object class from initializer
+  local obj = self:new(...)
+  -- if self.init then self:init(...) end 
+  return obj end } 
 
 setmetatable(meta,{__type = "object meta", __index = object }) setmetatable(object,meta)
 
@@ -154,10 +154,6 @@ local function getDataStore(obj,create)
   return meta.__data
 end
 
------------- ------------ ------------ 
--- serial - pretty print data value(s)
------------- ------------ ------------ 
-
 ----- ----- ----- ----- ----- -----
 -- default settings for string gen.
 
@@ -186,7 +182,6 @@ local _tostringSettings = {
   ----- ----- -----
     
 }
-
 
 ------------ ------------ ------------ 
 -- (top level) helpers for building object
@@ -1380,23 +1375,125 @@ object.unshift = object.insertFirst
 object.shift = object.removeFirst
 object.push = object.insertLast
 object.pop = object.removeLast
-object.slice = object.removeAtIndex
 
 ---- ------ ---- ---- ------ ----
 
--- (object.splice) - behaves similarly javascript splice method.
+------- ------- ------- ------- ------- ----
+-- Array Manipulation Methods - (Javascript)
+------- ------- ------- ------- ------- ----
 
--- (index) - starting index
--- (count) - number of elements to remove
--- (vararg) - elements to insert after index
+-- (*) https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array (*) ---- --- ---- --- ---- ---
 
--- for (index) and (count), if the number is  positive, then the indes is from start or end, or the element count is forward or backwards
+-- note: these functions are very similar to the Javascript Array function implementations: 
+
+------ ------- ------ ------- ------ ------- 
+-- :slice(self,index) | :splice(self,index)
+------ ------- ------ ------- ------ ------- 
+
+-- helper functions -->
+
+-- (private) helper - gets index and count for :slice() and :splice functions
+
+local function _getIndexies(self,index,count)
+  
+  local _index, _count = index, count
+  
+  if index == 0 then index = 1
+   count = count <= 0 and 0 or count - 1
+  elseif index < 0 then
+   index = #self + index end
+  index = index < 0 and 0 or index
+  
+  if count < 0 then
+    
+    if count < -1 then
+     index = index + count + 1
+    end count = math.abs(count)
+    
+    if index < 1 then 
+     count,index = count + (index - 1), 1
+        
+  end end
+  
+  index = _index < 0 and index + 1 or index
+  count = count > #self and #self or count
+  
+  return index,count -- returns: index and count (numbers)
+  
+end
+
+------ ------ ------ ------ 
+
+-- (object.slice|index,count|) - creates a shallow copy of range of table indexies
+
+-- (index) - starting index - can be positive (from start) or negative (from end)
+-- (count) - number of elements to remove - can be positive (remove forwards) or negative (remove backwards)
+
+object.slice = function(self,index,count)
+  
+  if not _canFunctionRun{ 
+    method = "object.slice",
+    types = {"table"},
+  self = self } then return end
+  
+  local insert,slice = table.insert, {}
+  index,count = _getIndexies(self,index,count)
+  
+  if index <= #self then
+    for i = 0, count - 1 do 
+     insert(slice,self[index + i])
+   end end
+  
+  slice = _isObject(self) and object(slice)
+  return slice -- returns: table or object
+  
+end
+
+------ ------ ------ ------ 
+
+-- (object.splice|index,count,...|) - replace index range in a table with a variable list of arguments - behaves similarly to the javascript Array.splice method.
+
+-- (index) - starting index - can be positive (from start) or negative (from end)
+-- (count) - number of elements to remove - can be positive (remove forwards) or negative (remove backwards)
+-- (vararg) - elements to insert at index - before (negative index) or after (positive index)
 
 object.splice = function(self,index,count,...)
   
-  local removed = {}
+  if not _canFunctionRun{ 
+    method = "object.splice",
+    types = {"table"},
+  self = self } then return end
+ 
+  local insert,remove = table.insert,table.remove
   
-return unpack(removed) end
+  ---- ------ ---- ------
+  local removed = {} ------
+  ---- ------ ---- ------
+  
+  local _index, _count = index, count
+  index,count = _getIndexies(self,index,count)
+  
+  if index <= #self then
+   for i = 1, count do 
+    insert(removed,remove(self,index))
+  end end
+  
+  ---- ------ ----
+  
+  local spliced,len = {...}, select("#",...)
+  if index > #self then index = #self + 1 end
+  
+  if _index < 0 then
+    if _count > 0 and _count + _index >= 0 then index = #self + 1 end
+  end
+  
+  for i = 1, len do
+   insert(self,index, spliced[len + 1 - i])
+  end
+  
+ return unpack(removed) -- returns: vararg 
+  
+end
 
 ------- ------- ------- ------- ------- ----
 -- Querying / Search Methods
@@ -1415,8 +1512,8 @@ object.length = function(o) return #o end
 object.count = object.countElements
 
 ------- ------- ------- -------
-object.ext:getter("count")
 object.ext:getter("length") 
+object.ext:getter("count")
 ------- ------- ------- -------
 
 -- object:contains(...) - determines if one or more entries exists in a source table
@@ -1514,7 +1611,7 @@ object.hasKeys = function(self,...)
  if not self or type(self) ~= "table" then return false end
  for i = 1, select("#",...) do
   if not self[select(i,...)] then return false end
-  end return true end
+ end return true end
 
 ---- ---- ------
 
@@ -1542,7 +1639,11 @@ object:extend("first"); object:extend("last")
   
 object.first.indexOf = function(self,...)
   return _indexOf(self,false,...)
- end -- returns: vararg - indices or nils
+end -- returns: vararg - indices or nils
+
+--- --- --- ---- --- --- --- ---- --- ---
+object.indexOf = object.firstIndexOf
+--- --- --- ---- --- --- --- ---- --- ---
 
 object.last.indexOf = function(self,...)  
   return _indexOf(self,true,...)    
@@ -1706,12 +1807,12 @@ end -- returns: object - copy of object
 
 object.inverse = function(self) -- Inverses numerical indexies of array
   local pos = 0 for i = #self,1,-1 do i = i + pos self:insert(pos + 1, self:remove(i)) 
-  pos = pos + 1 end  return self
+  pos = pos + 1 end return self
 end
 
----------- -------- ----------
-object.inverseIndexies = object.inverse
----------- -------- ----------
+--- --- --- ---- --- --- --- ---- --- ---
+object.reverse = object.inverse ----
+--- --- --- ---- --- --- --- ---- --- ---
 
 object.concat = function(self,sep) -- Concantinates table indexies
     
@@ -1735,9 +1836,9 @@ object.concat = function(self,sep) -- Concantinates table indexies
         
  end -- returns: (string) - table indexes converted into a string
 
----------- -------- ----------
+--- --- --- ---- --- --- --- ----
 object.cat = object.concat
----------- -------- ----------
+--- --- --- ---- --- --- --- ---- 
 
 -- Gets objects' __type values or data type
 
@@ -1765,7 +1866,7 @@ object.is = function(self,...)
 end
 
 -------- -------- -------- -------- 
-object:extend("is")
+object:extend("is") ---- --- --
 -------- -------- -------- -------- 
 
 -- TODO - this should either be lazy load or dynamic cache as objects are built rather than created each time  ...
@@ -1805,7 +1906,7 @@ object.is.instanceOf = function(self,...)
   
   local isObject = _isObject(self) == true 
   
-  for i = 1, select("#",...) do
+  for i = 1, count do
     
     local arg = select(i,...)
     if _type == "string" and arg ~= string then 
@@ -2801,6 +2902,15 @@ _indexOf = function(self,last,...)
     
   return unpack(args)
     
+end
+
+-------- ------ >>
+-- rounds floating point number to a given number of decimal places
+
+_roundNumber = function(float,dps)
+  local mult = 10^(dps or 0)
+  if (num * mult) % 1 >= 0.5 then return math.ceil(float * mult)/mult 
+  elseif (num * mult) % 1 < 0.5 then return math.floor(num * mult)/mult end
 end
 
 -------- ------ >>
