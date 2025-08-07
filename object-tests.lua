@@ -425,6 +425,73 @@ function()
   
 end
 
+objectTests.structs["8-06-25:(:slice/:splice)"] = function()
+  
+  local test = object{"a","b","c","seed",
+   "stem", leaves = "green", bark = "brown", "plant","tree"}
+  
+  print("Testing object.slice and object:splice methods ...")
+  
+  print("This is the test object:",test)
+  
+  local letters = test:slice(1,3)
+  
+  print("test:slice(1,3)")
+  
+  -- Expected Output: letters:  (object[3]: 0x133d50a00):{01:"a", 02:"b", 03:"c"}
+  
+  print("letters:",letters)
+  
+  local plant = test:slice(-4,3)
+  local plantStem = test:slice(-2,-2)
+  
+  print("plant = test:slice(-4,3)")
+  print("plantStem = test:slice(-2,-2)")
+  
+  print("plant:", plant, "plantStem:", plantStem)
+  
+  -- Expected Output: plant:	(object[3]: 0x1339ad3c0):{01:"seed", 02:"stem", 03:"plant"}	plantStem:	(object[2]: 0x1339ad280):{01:"stem", 02:"plant"}
+  
+  print("test:",test)
+  
+  print("test.length / test.count - getters for lengrh and number of elements ...")
+  
+  print("length:",test.length,
+   "count:",test.count)
+  
+  -- Expected Output: test:	(object[7]: 0x133bea380):{01:"a", 02:"b", 03:"c", 04:"seed", 05:"stem", 06:"plant", 07:"tree", bark:"brown", leaves:"green"}	length:	7
+  
+  test:splice(2,1,"b1","b2","b3")
+  print('test:splice(2,1,"b1","b2","b3")')
+  print("test:",test,"length:",test.length)
+  
+  -- Expected Output: test:	(object[9]: 0x133bea380):{01:"a", 02:"b1", 03:"b2", 04:"b3", 05:"c", 06:"seed", 07:"stem", 08:"plant", 09:"tree", bark:"brown", leaves:"green"}	length:	9
+  
+  test:splice(-2,-3,"soil")
+  print('test:splice(-2,-3,"soil")')
+  print("test:",test,"length:",test.length)
+  
+  -- Expected Output: test:	(object[7]: 0x133beb540):{01:"a", 02:"b1", 03:"b2", 04:"b3", 05:"c", 06:"soil", 07:"tree", bark:"brown", leaves:"green"}	length:	7
+  
+  test:splice(0,1,"z")
+  print('test:splice(0,1,"z")')
+  print("test:",test,"length:",test.length)
+  
+  -- Expected Output: test:	(object[8]: 0x133bea380):{01:"z", 02:"a", 03:"b1", 04:"b2", 05:"b3", 06:"c", 07:"soil", 08:"tree", bark:"brown", leaves:"green"}	length:	8
+  
+  print("using splice at index 0 with 0 or 1 as the count will not replace anything, because array indexes start at 1 in Lua.")
+  
+  test:splice(0,3)
+  
+  print('test:splice(0,3)')
+  print("test:",test,"length:",test.length)
+  
+  -- Expected Output: test:	(object[6]: 0x133bea380):{01:"b1", 02:"b2", 03:"b3", 04:"c", 05:"soil", 06:"tree", bark:"brown", leaves:"green"}	length:	6
+  
+   print("Done testing object.slice() and object.splice() !")
+  
+end
+
 -------------------------------------------
 -- private methods ...
 -------------------------------------------
