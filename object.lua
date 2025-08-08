@@ -226,6 +226,16 @@ local _upperOrLower = function(str,upper)
  local out = gsub(str,"(%a)(%a+)",form)
  return out end
 
+-------- ------ >>
+-- (helper) - creates iterator for vararg
+
+local iter = function(...)
+ local args, i = {...}, 0 
+ return function() i = i + 1;
+  if i <= #args then return i, args[i] end
+  return nil end
+end -- returns: (function - iterator)
+
 ------------ ------------ ------------
 ------------ ------------ ------------ 
 -- Object Extension Module :init() - (object:ext()) ----------- ----------- ---------
@@ -431,7 +441,6 @@ local function getBackReference(self)
         
 end  -- returns: alias root target
 
-
 ------------ ------------ ------------
 -- (private) ::proxy:: - creates a proxy object for extensions and tables/objects
 
@@ -495,7 +504,8 @@ local _proxy = function(ext,obj)
                             
          __data = {             
           -- stores ext name path data                              
-          path = type(name) == "string" and {name} or type(name) == "table" and name                    
+          path = type(name) == "string" and {name} or type(name) == "table" and name      
+            
          },
             
          -------- ---- ------- ----
@@ -533,7 +543,11 @@ local _proxy = function(ext,obj)
                             
           __data = {             
             -- stores ext name path data                              
-            path = type(name) == "string" and {name} or type(name) == "table" and name                    
+            path = type(name) == "string" and {name} or type(name) == "table" and name,
+              
+              -- members  
+              -- proto
+              
           },
                             
           -------- ------ ---- >               
@@ -542,12 +556,15 @@ local _proxy = function(ext,obj)
           __tostring = function(pointer) 
                                 
            local list,meta,key,val = {}, getmetatable(pointer)
-                                
+
            local path = meta.__data.path
            local methodName = path[#path]
            local prefix = concat(path)                                                 
-           local level = pointer.self
-                                
+           local level =  pointer.self
+              
+           local store = getExtStore(pointer.self)
+              print(store)
+                                 
            while(level) do 
                                     
             key,val = next(level,key)    
@@ -566,7 +583,7 @@ local _proxy = function(ext,obj)
            ------ ---- ------ ---- --   
                                              
            -- the __self an extension could also be serialized here ... [descriptors.osd ] -- TBD
-                                
+                  
            local osd = _objSerialDescriptor                  
            local descriptors = {
             "self", osd = concat(
@@ -967,13 +984,18 @@ end
 
 -- object.insert|...| -- These functions are used to add data to the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:insert() block call connections -> object:insert():First(values):Last(values).
 
-object.insert = table.insert
+-------------------- --------------------
 
+--- --- --- ---- --- --- --- ---- --- ---
+object.insert = table.insert
+--- --- --- ---- --- --- --- ---- --- ---
 ------ ---- ------ ---- ------
 object:extend("insert") ---- ---- (*)
 ------ ---- ------ ---- ------
 
+--- --- --- ---- --- --- --- ---- --- ---
 -- inserts at the start of a table/string
+
 object.insert.first = function(self,...)
     
   if not _canFunctionRun{ 
@@ -1008,9 +1030,13 @@ end -- returns: table (self)
 
 -- object.unshift = object.insert.first
 
----- ---- ------
+--- --- --- ---- --- --- --- ---- --- ---
+object.unshift = object.insertFirst ----
+--- --- --- ---- --- --- --- ---- --- ---
 
+--- --- --- ---- --- --- --- ---- --- ---
 -- inserts at the end of a table/string
+
 object.insert.last = function(self,...)
     
   if not _canFunctionRun{ 
@@ -1046,9 +1072,13 @@ end -- returns: table (self)
 
 -- object.push = object.insert.last
 
----- ---- ------
+--- --- --- ---- --- --- --- ---- --- ---
+object.push = object.insertLast ----
+--- --- --- ---- --- --- --- ---- --- ---
 
+--- --- --- ---- --- --- --- ---- --- ---
 -- inserts at an index of a table/string
+
 object.insert.atIndex = function(self,index,...)
     
   if not _canFunctionRun{ 
@@ -1122,13 +1152,227 @@ object.insert.keysFromTable = function(self,source,overwrite) -- inserts keys fr
 
 -- object.remove|...| -- These functions are used to remove data from the array portion of an object. All the methods can be referenced from calling their direct method name or by using the object:remove()
 
-object.remove = table.remove
+-------------------- --------------------
 
+--- --- --- ---- --- --- --- ---- --- ---
+object.remove = table.remove
+--- --- --- ---- --- --- --- ---- --- ---
 ------ ---- ------ ---- ------
 object:extend("remove") ---- ---- (*)
 ------ ---- ------ ---- ------
 
--- removes one or more indexies from table
+--- --- --- ---- --- --- --- ---- --- ---
+-- remove index value(s) from table start
+
+object.remove.first = function(self,number) 
+    
+  if not _canFunctionRun{ 
+   method = "object.remove.first",
+   types = {"table"},
+   self = self } then return end
+    
+  if not number or number == 1 or number == -1 then return table.remove(self,1)  
+  elseif number == 0 then return end 
+    
+  local out = {} number = abs(number) 
+  for i = 1,number do out[i] = table.remove(self,1) end
+    
+ return unpack(out) end -- returns: vararg of removed values
+
+--- --- --- ---- --- --- --- ---- --- ---
+object.shift = object.removeFirst ----
+--- --- --- ---- --- --- --- ---- --- ---
+object.remove:extend("first") ---- ----
+------ ---- ------ ---- ------ ---- ------
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- removes the firat occurance of a data value from a given table
+
+object.remove.first.indexOf = 
+ function(self,value,from)
+  
+  if not _canFunctionRun{ 
+   method = "object.remove.firstIndexOf",
+   types = {"table"},
+   self = self } then return end
+  
+  local index = object.firstIndexOf(self,value,from)
+  
+  if index > 0 then
+   return table.remove(self,index) end 
+  
+end
+
+--- --- --- ---- --- --- --- ---- --- --- ---
+object.remove.indexOf = object.remove.first.indexOf
+--- --- --- ---- --- --- --- ---- --- --- ---
+
+--- --- --- ---- --- --- --- ---- --- ---
+
+object.remove.first.indexiesOf = 
+function(self,...)
+  
+end
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- remove index value(s) from table end
+
+object.remove.last = function(self,number) 
+    
+  if not _canFunctionRun{ 
+   method = "object.remove.last",
+   types = {"table"},
+   self = self } then return end
+    
+  if not number or number == 1 or number == -1 then return table.remove(self,#self) 
+  elseif number == 0 then return end
+    
+  local reps,out = #self + 1,{} number = abs(number) 
+  for i = 1,number do out[1 + number - i] = table.remove(self,reps - i) end
+    
+ return unpack(out) end -- returns: vararg of removed values
+
+--- --- --- ---- --- --- --- ---- --- ---
+object.pop = object.removeLast ----
+------ ---- ------ ---- ------ ---- ------
+object.remove:extend("last") ---- ----
+------ ---- ------ ---- ------ ---- ------
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- removes the last occurance of a data value from a given table
+
+object.remove.last.indexOf = 
+function(self,value,from)
+  
+  if not _canFunctionRun{ 
+    method = "object.remove.firstIndexOf",
+    types = {"table"},
+  self = self } then return end
+  
+  local index = object.lastIndexOf(self,value,from)
+  
+  if index > 0 then
+  return table.remove(self,index) end 
+  
+end
+
+--- --- --- ---- --- --- --- ---- --- ---
+
+object.remove.last.indexiesOf = 
+ function(self,...)
+  
+end
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- remove value(s) from a table which are stored before a certain indice
+
+object.remove.beforeIndex =
+ function(self,index,number) 
+    
+  if not _canFunctionRun{ 
+   method = "object.remove.beforeIndex",
+   types = {"table"},
+   self = self } then return end
+    
+  if index <= 1 then return false else max = #self; index = index > max and max or index end
+    
+  number = number and abs(number) or math.huge local out = {} 
+    
+  for i = 1,number do index = index - 1 
+   if self[index] then 
+    out[i] = table.remove(self,index) 
+   else break end end
+    
+return unpack(out) end -- returns: vararg of removed values   
+
+--- --- --- ---- --- --- --- ---- --- ---
+
+-- remove value(s) from a table which are stored after a certain indice
+
+object.remove.afterIndex = function(self,index,number) 
+  
+  if not _canFunctionRun{ 
+    method = "object.remove.afterIndex",
+    types = {"table"},
+  self = self } then return end
+  
+  local max = #self; 
+  index = index <= 1 and 2 or index > max and max + 1 or index + 1 
+  
+  number = number and abs(number) or math.huge local out = {} 
+  
+  for i = 1,number do 
+    if self[index] then
+      out[i] = table.remove(self,index) 
+    else break end end
+  
+return unpack(out) end -- returns: vararg of removed values
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- remives a set number of values ar a given index from a table (including the index)
+
+object.remove.atIndex = 
+ function(self,index,count)
+  return object.splice(self,index,count)
+end
+
+--- --- --- ---- --- --- --- ---- --- ---
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- (helper) gets index point for a positive or negative index value
+
+local function _anchorIndex(self,index)  
+ if type(index) ~= "number" then 
+   return -1 end
+ if index < 1 then index = #self + index + 1  
+ return index and 0 or index >= #self and #self or index end
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- removes a range of elements in a table from start to fin. if start is greater than fin then the range is inverted ...
+--- --- --- ---- --- --- --- ---- --- ---
+
+object.remove.range = function(self,start,fin)
+  
+  if not _canFunctionRun{ 
+   method = "object.remove.range",
+   types = {"table"},
+   self = self } then return end
+  
+  local removed = {}
+     
+  local insert,remove = table.insert,table.remove
+  
+  if not start and not fin then
+    for i = 1,#self do insert(removed,remove(self,1))
+  end return unpack(removed) end
+  
+  start,fin = _anchorIndex(self,start)
+  _anchorIndex(self,fin)
+    
+  --- ---- --- ---- ---
+    
+  if start == -1 then -- only fin declares
+   for i = 1,fin do 
+    insert(removed,remove(self[1])) end
+      
+  elseif fin == -1 then -- only start declared
+   for i = start,#self do 
+    insert(removed,remove(self[start])) end
+      
+  else -- default behavior (start and fin)
+   if start > fin then  
+    start,fin = fin,start end
+   for i = start,fin do 
+    insert(removed,remove(self[start])) end 
+  end end
+  
+  unpack(removed) -- returns vararg (removed values)
+  
+ end
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- removes one or more indexies from table. note: the indexies can be in any order
+
 object.remove.indexies = function(self,...) 
     
   if not _canFunctionRun{ 
@@ -1180,9 +1424,9 @@ object.remove.indexies = function(self,...)
     
  return unpack(out,1,len) end -- returns vararg (removed values)
 
----- ---- ------
-
+--- --- --- ---- --- --- --- ---- --- ---
 -- removes one or more keys from table
+
 object.remove.keys = function(self,...)
     
   if not _canFunctionRun{ 
@@ -1216,167 +1460,65 @@ object.remove.keys = function(self,...)
     
  return unpack(out,1,len) end -- output (removed values)
 
----- ---- ------
-
--- remove index value(s) from table start
-object.remove.first = function(self,number) 
-    
-  if not _canFunctionRun{ 
-   method = "object.remove.first",
-   types = {"table"},
-   self = self } then return end
-    
-  if not number or number == 1 or number == -1 then return table.remove(self,1)  
-  elseif number == 0 then return end 
-    
-  local out = {} number = abs(number) 
-  for i = 1,number do out[i] = table.remove(self,1) end
-    
- return unpack(out) end -- returns: vararg of removed values
-
----- ---- ------
-
--- remove index value(s) from table end
-object.remove.last = function(self,number) 
-    
-  if not _canFunctionRun{ 
-   method = "object.remove.last",
-   types = {"table"},
-   self = self } then return end
-    
-  if not number or number == 1 or number == -1 then return table.remove(self,#self) 
-  elseif number == 0 then return end
-    
-  local reps,out = #self + 1,{} number = abs(number) 
-  for i = 1,number do out[1 + number - i] = table.remove(self,reps - i) end
-    
- return unpack(out) end -- returns: vararg of removed values
-
----- ---- ------
-
--- remove value(s) from a table which are stored before a certain indice
-object.remove.beforeIndex = function(self,index,number) 
-    
-  if not _canFunctionRun{ 
-   method = "object.remove.beforeIndex",
-   types = {"table"},
-   self = self } then return end
-    
-  if index <= 1 then return false else max = #self; index = index > max and max or index end
-    
-  number = number and abs(number) or math.huge local out = {} 
-    
-  for i = 1,number do index = index - 1 
-   if self[index] then 
-    out[i] = table.remove(self,index) 
-   else break end end
-    
-return unpack(out) end -- returns: vararg of removed values   
-
----- ---- ------
-
--- remove value(s) from a table which are stored after a certain indice
-object.remove.afterIndex = function(self,index,number) 
-    
-  if not _canFunctionRun{ 
-   method = "object.remove.afterIndex",
-   types = {"table"},
-   self = self } then return end
-    
-  local max = #self; 
-  index = index <= 1 and 2 or index > max and max + 1 or index + 1 
-    
-  number = number and abs(number) or math.huge local out = {} 
-    
-  for i = 1,number do 
-   if self[index] then
-    out[i] = table.remove(self,index) 
-   else break end end
-    
-return unpack(out) end -- returns: vararg of removed values
-
----- ---- ------
-
-object.remove.atIndex = function(self,index,number) -- removes number of entries at index 
-    local max = #self; index = index < 1 and 1 or index > max and max or index
-    if not number or number == 1 or number == -1 then return table.remove(self,index)
-    else local out,arg = {},number/abs(number) -- removes entries to left or right
-        if arg == 1 then for i = index,index + number - 1 do if not self[index] then break
-                else table.insert(out,table.remove(self,index)) end end
-        else arg = 0 for i = index,index + number + 1,-1 do if not self[index - arg] then break
-                else table.insert(out,table.remove(self,index - arg)) arg = arg + 1 end end end
-    return unpack(out) end end -- returns: vararg of removed values
-
----- ---- ------
-
-object.remove.firstIndexOf = function(self,val,...) -- removes values from their first table indexies
-    local max,extra,removed = #self,select("#",...),0 if val then for i = 1,max do
-            if self[i] == val then val = table.remove(self,i) max = max - 1 removed = 1 break 
-            elseif i == max then val = false end end end
-    if extra == 0 then return val else local out,args = removed == 1 and {val} or {}, {...}
-        local arg for i = 1,extra do arg = args[i]
-            for i = 1,max do if self[i] == arg then removed = removed + 1
-                    out[removed] = table.remove(self,i) max = max - 1 break end end end
-    return unpack(out) end end
+--- --- --- ---- --- --- --- ---- --- ---
 
 object.remove.indexiesOf = function(self,...)
   
-    local args = {...}
-    for i = 1,#args do 
-     local entry,selfLength = args[i], #self
-     for j = 1,selfLength do
-       local tableEntry = self[j]
-       while tableEntry == entry do 
-        table.remove(self,j)
-        tableEntry,selfLength = self[j], selfLength - 1         
-       end end end
-    return unpack(args)
-    
 end
 
-object.remove.lastIndexOf = function(self,val,...) -- removes values from their last indexies in table
-    local max,extra,removed = #self,select("#",...),0 if val then for i = max,1,-1 do
-            if self[i] == val then val = table.remove(self,i) max = max - 1 removed = 1 break 
-            elseif i == 1 then val = false end end end
-    if extra == 0 then return val else local out,args = removed == 1 and {val} or {}, {...}
-        local arg for i = 1,extra do arg = args[i]
-            for i = max,1,-1 do if self[i] == arg then removed = removed + 1
-                    out[removed] = table.remove(self,i) max = max - 1 break end end end
-    return unpack(out) end end
+--- --- --- ---- --- --- --- ---- --- ---
 
-object.remove.range = function(self,first,last) -- removes entries within range of indexies
-    local max = #self; first = first < 1 and 1 or first > max and max or first
-    last = last < 1 and 1 or last > max and max or last   
-    if first == last then return self[first] and table.remove(self,first) or false -- removes single entry
-    elseif first < last then local out = {} -- starts at first index and loops until last
-        for i = 1, last - first + 1 do out[i] = table.remove(self,first) end return unpack(out)
-    elseif last < first then local out = {} -- starts at last index and loops until first
-        for i = 1, first - last + 1 do out[i] = table.remove(self,last) end return unpack(out) end end
+object.remove.keysOf = function(self,...)
+  
+end
 
-object.remove.entry = function(self,entry) -- finds entry in table and removes all instances
-    if not self then error("Invalid argument no.1 'self' to object.removeEntry().") end
-    --print(self)
-    object.removeIndexiesOf(self,entry)
-    local keys = object.keysOf(self,entry) 
-    for i = 1,#keys do self[keys[i]] = nil end
-return entry end
+--- --- --- ---- --- --- --- ---- --- ---
+-- finds entry in table and removes all instances
 
-object.remove.entries = function(self,...) -- finds values in table and removes them
-    if not self then error("Invalid argument no.1 'self' to object.removeEntries().") end
-    local args,pos = {...} for i = 1,#args do 
-        object.removeEntry(self,args[i]) end 
-return unpack(args) end
+object.remove.entry = function(self,val) 
+  
+  if not _canFunctionRun{ 
+    method = "object.remove.entry",
+    types = {"table"},
+  self = self } then return end
+  
+  --- ---- --- ----
+  
+  local out = {}
+  local insert,remove = table.insert, table.remove
+  
+  local indexiesOf = object.indexiesOf
+  local entriesOf = object.entriesOf 
+  
+  --- ---- --- ----
+  
+  for _,index in iter(indexiesOf(self,val)) do
+  remove(self,index); insert(out,index)  end
+  for _,entry in iter(entriesOf(self,val)) do
+    self[entry] = nil; insert(out,entry) end
+  
+  return unpack(out) 
+  -- returns: (vararg) removed indexies / keys
+end
 
----- ------ ---- ------ -- >>
+--- --- --- ---- --- --- --- ---- --- ---
+-- removes all occurancaces of given entriea from a table
 
--- (alias names) - object.insert|...| / object.remove|...| declaration point ...
+object.remove.entries = function(self,...) 
+  
+  if not _canFunctionRun{ 
+    method = "object.remove.entries",
+    types = {"table"},
+  self = self } then return end
+  
+  local args,pos = {...} for i = 1,#args do 
+    object.removeEntry(self,args[i]) end 
+  
+  return unpack(args) 
+  
+end -- returns: (vararg) removed entries
 
-object.unshift = object.insertFirst
-object.shift = object.removeFirst
-object.push = object.insertLast
-object.pop = object.removeLast
-
----- ------ ---- ---- ------ ----
+--- --- --- ---- --- --- --- ---- --- ---
 
 ------- ------- ------- ------- ------- ----
 -- Array Manipulation Methods - (Javascript)
@@ -1554,12 +1696,17 @@ local function _findEntries(self,form,...)
   while(index) do
    if vals[val] then 
       local _type = type(index)
+      
       if form == "keys" and _type ~= "number" or form == "indexies" and _type == "number" or not form then
-      table.insert(out,index) end
+        
+      if _type == "number" and (form ~= "indexies" or form == "indexies" and index <= #self) or _type ~= "number" then table.insert(out,index) 
+          
+      end end
+      
     end index,val = next(self,index)
   end return unpack(out)
   
-end
+end -- returns: (vararg) keys and/or indexies
 
 ---- ---- ------
 
@@ -1567,7 +1714,7 @@ end
 
 object.indexies = function(self)
   return unpack(self,1,#self)
-end
+end -- returns: (vararg) table indexies
 
 ---- ---- ------
 
@@ -1575,7 +1722,7 @@ end
 
 object.indexiesOf = function(self,...)
   return _findEntries(self,"indexies",...)
-end
+end -- returns: (vararg) indexies
 
 ---- ---- ------
 
@@ -1590,7 +1737,8 @@ object.keys = function(self)
     table.insert(keys,index) end
    index = next(self,index) end
   
- return unpack(keys) end 
+ return unpack(keys) 
+end -- returns: (vararg) table keys
 
 ---- ---- ------
 
@@ -1598,7 +1746,7 @@ object.keys = function(self)
 
 object.keysOf = function(self,...)
  return _findEntries(self,"keys",...)
-end
+end -- returns: (vararg) keys
 
 ---- ---- ------
 
@@ -1612,11 +1760,13 @@ object.hasKeys = function(self,...)
 
 ---- ---- ------
 
--- object:find(...) - finds indecies or keys of one or more values in a source table
+-- object:entriesOf(...) - finds indecies or keys of one or more values in a source table
 
-object.find = function(self,...)
+object.entriesOf = function(self,...)
   return _findEntries(self,nil,...)
-end
+end -- returns: (vararg) indexies and keys
+
+-- object.find ?????
 
 -------- -------- -------- -------- --------
 -- object.first|...| / object.last|...|
@@ -1764,36 +1914,37 @@ end
 -------- -------- -------- -------- --------
 -- object.copy|options| -- Prefix
 -------- -------- -------- -------- --------
--- object.copy - copies an object based on the memory access pointer locations at a given level for a lua data type
+-- object.copy - copies a table and table's metatable recursively to a particular depth
 
--- options: {meta: boolean, depth:number}
+-- options: (string|table) 
+-- - string - '*' - deep copy
+-- - number - depth (default:1)
+-- - table - {meta: boolean, depth:number}
+
 ---- ---- ---- ---- ---- ---- ---- ----
 
 object.copy = function(self,opt)
 
-  if not _canFunctionRun{ 
-   method = "object.copy",
-   types = {"table"}, self = self } 
-  then return end
+ if not _canFunctionRun{ 
+  method = "object.copy",
+  types = {"table"}, self = self } 
+ then return end
+    
+ local format,meta = type(opt), true
+ local depth = format == "number" and opt or 
+  opt == "*" and math.huge or 1
   
-  local depth,meta = 1, true
-  
-  if opt then
-    
-   if type(opt) == "number" then
-    depth = opt end
-    
-   meta = (opt.meta and type(opt.meta) == "boolean") or true
-   depth = (opt.depth and type(opt.depth) == "number") or 1
-    
+ if format == "table" then
+  meta = (opt.meta and type(opt.meta) == "boolean") or true 
+  depth = (opt.depth and type(opt.depth) == "number") or 1
   end
-
+  
   local copy = _copy(self,depth)
-  local meta = getmetatable(self)
   
-  if meta then 
-   setmetatable(copy, _copy(meta,depth)) 
-  end
+  if not object.isObject(self) then
+   local meta = getmetatable(self)
+   if meta then setmetatable(copy,_copy(meta,depth)) 
+  end end
   
   return copy -- returns: copy of table
   
@@ -1803,26 +1954,9 @@ end
 object:extend("copy")
 -------- -------- -------- -------- 
 
-object.copy.deep = function(self) -- Creates a deep copy of object table and metatable
-  
-  if type(self) ~= "table" then
-    -- error("object.copy: self was not table. ",self)
-    return self
-  end
-  
-  local meta,metaFm,copy = {}, getmetatable(self) or {},{} 
-  
-  for k,v in pairs(metaFm) do 
-    meta[k] = v end
-  
-  for key,value in pairs(self) do 
-    if type(value) ~= "table" then copy[key] = value
-    else copy[key] = object.copy(value)
-    end end setmetatable(copy,meta) 
-  
-  return copy 
-  
-end -- returns: object - copy of object
+object.copy.deep = function(self) -- Creates a deep copy of object table and metatable  
+ return object.copy(self,{depth = math.huge})
+end
 
 -------- -------- -------- -------- 
 -- Object Status / Configuration Methods
@@ -2980,23 +3114,42 @@ end
 -------- ------ >>
 -- helper: creates a copy of a table value to a given depth
 
-_copy = function(self,depth) 
+_copy = function(self,depth,temps) 
   
   if not self or depth == 0 then
   return self end
   
-  local copy = {} 
+  local copy = {}
+  
+  ---- --- ---- --- ----
+  
+  if object.isObject(self) then
+    
+   local proto, objectProto = object.proto(self), object:proto()
+    
+   if proto and proto ~= objectProto then
+    copy = proto(copy)
+   elseif proto then 
+    copy = object(copy)
+    
+  end end
+  
+  ---- --- ---- --- ----
+  
+  if temps == nil then 
+    temps = {[self] = copy} end
+  
   for k,v in pairs(self) do 
     
-    local value,type = self[k],type(v)
-    if type == "string" or type == "number" 
-    or type == "boolean" then copy[k] = v 
+   local value,type = self[k],type(v)
+   if type == "string" or type == "number" 
+    or type == "boolean" or type == "function" then copy[k] = v 
       
-    elseif type == "table" or 
-    type == "function" then  
-      if depth == 1 then copy[k] = v
-      else copy[k] = _copy(v, depth - 1)
-      end end end
+   elseif type == "table" then
+     if depth == 1 then copy[k] = v
+      elseif temps[v] then copy[k] = temps[v]
+      else temps[v] = _copy(v, depth - 1, temps); copy[k] = temps[v]
+    end end end
   
   return copy
   
