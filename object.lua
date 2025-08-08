@@ -561,9 +561,6 @@ local _proxy = function(ext,obj)
            local methodName = path[#path]
            local prefix = concat(path)                                                 
            local level =  pointer.self
-              
-           local store = getExtStore(pointer.self)
-              print(store)
                                  
            while(level) do 
                                     
@@ -1321,11 +1318,17 @@ end
 --- --- --- ---- --- --- --- ---- --- ---
 -- (helper) gets index point for a positive or negative index value
 
-local function _anchorIndex(self,index)  
+local function _anchorIndex(self,index,start)  
+  
  if type(index) ~= "number" then 
-   return -1 end
- if index < 1 then index = #self + index + 1  
- return index and 0 or index >= #self and #self or index end
+   return end
+  
+ if index < 1 then 
+   index = #self + index
+   if start then index = index + 1 end
+ end
+
+ return index < 1 and 1 or index >= #self and #self or index end 
 
 --- --- --- ---- --- --- --- ---- --- ---
 -- removes a range of elements in a table from start to fin. if start is greater than fin then the range is inverted ...
@@ -1346,25 +1349,25 @@ object.remove.range = function(self,start,fin)
     for i = 1,#self do insert(removed,remove(self,1))
   end return unpack(removed) end
   
-  start,fin = _anchorIndex(self,start)
-  _anchorIndex(self,fin)
-    
+  local start = _anchorIndex(self,start,true)
+  local fin = _anchorIndex(self,fin)
+
   --- ---- --- ---- ---
     
-  if start == -1 then -- only fin declares
+  if not start then -- only fin declares
    for i = 1,fin do 
-    insert(removed,remove(self[1])) end
+    insert(removed,remove(self,1)) end
       
-  elseif fin == -1 then -- only start declared
+  elseif not fin then -- only start declared
    for i = start,#self do 
-    insert(removed,remove(self[start])) end
+    insert(removed,remove(self,start)) end
       
   else -- default behavior (start and fin)
    if start > fin then  
     start,fin = fin,start end
    for i = start,fin do 
-    insert(removed,remove(self[start])) end 
-  end end
+    insert(removed,remove(self,start)) end 
+  end 
   
   unpack(removed) -- returns vararg (removed values)
   
@@ -1492,11 +1495,11 @@ object.remove.entry = function(self,val)
   
   --- ---- --- ----
   
-  for _,index in iter(indexiesOf(self,val)) do
-  remove(self,index); insert(out,index)  end
+  for i,idx in iter(indexiesOf(self,val)) do
+   remove(self,idx - i+1) insert(out,idx) end
   for _,entry in iter(entriesOf(self,val)) do
-    self[entry] = nil; insert(out,entry) end
-  
+   self[entry] = nil; insert(out,entry) end
+
   return unpack(out) 
   -- returns: (vararg) removed indexies / keys
 end
@@ -1693,17 +1696,16 @@ local function _findEntries(self,form,...)
    if args ~= nil then vals[arg] = true end
   end
   
-  while(index) do
-   if vals[val] then 
-      local _type = type(index)
+  while(index) do if vals[val] then 
+    local _type = type(index)
       
-      if form == "keys" and _type ~= "number" or form == "indexies" and _type == "number" or not form then
-        
-      if _type == "number" and (form ~= "indexies" or form == "indexies" and index <= #self) or _type ~= "number" then table.insert(out,index) 
-          
-      end end
+     if _type == "number" then
+      if ((index <= #self and form == "indexies") or (form == "keys" and index > #self) or not form) then 
+       table.insert(out,index) end
+      elseif form ~= "indexies" then
+       table.insert(out,index) end
       
-    end index,val = next(self,index)
+    end index,val = next(self,index) 
   end return unpack(out)
   
 end -- returns: (vararg) keys and/or indexies
