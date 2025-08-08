@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.12 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-07-25)
+-- object.lua - 3.14159 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-08-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -101,8 +101,8 @@ local _implicitSelfObj = nil
 local _handleToString, _objSerialDescriptor 
 local _errorHandler, _canFunctionRun
 ------------ ------------ ------------ 
-local _isObject, _firstOrLast, _indexOf,
- _roundNumber
+local _isObject, _firstOrLast, _indexiesOf,
+ _copy, _getIndexies, _roundNumber
 ------------ ------------ ------------
 
 ------------ ------------ ------------ 
@@ -1386,54 +1386,19 @@ object.pop = object.removeLast
 
 -- note: these functions are very similar to the Javascript Array function implementations: 
 
------- ------- ------ ------- ------ ------- 
--- :slice(self,index) | :splice(self,index)
------- ------- ------ ------- ------ ------- 
-
--- helper functions -->
-
--- (private) helper - gets index and count for :slice() and :splice functions
-
-local function _getIndexies(self,index,count)
-  
-  local _index, _count = index, count
-  
-  if index == nil and count == nil then
-    return 1, #self
-  end
-  
-  index,count = index and index or 1, count and count or 0
-  
-  if index == 0 then index = 1
-   count = count <= 0 and 0 or count - 1
-  elseif index < 0 then
-   index = #self + index end
-  index = index < 0 and 0 or index
-  
-  if count < 0 then
-    
-    if count < -1 then
-     index = index + count + 1
-    end count = math.abs(count)
-    
-    if index < 1 then 
-     count,index = count + (index - 1), 1
-        
-  end end
-  
-  index = _index < 0 and index + 1 or index
-  count = count > #self and #self or count
-  
-  return index,count -- returns: index and count (numbers)
-  
-end
-
------- ------ ------ ------ 
-
--- (object.slice|index,count|) - creates a shallow copy of range of table indexies
+------ ------- ------ ------- ------ -------- 
+-- slice(self,index,count) --- ---- -----
+-- splice(self,index,count,...) --- -----
+------ ------- ------ ------- ------ -------- 
 
 -- (index) - starting index - can be positive (from start) or negative (from end)
 -- (count) - number of elements to remove - can be positive (remove forwards) or negative (remove backwards)
+
+-- (vararg) - elements to insert at index - before (negative index) or after (positive index)
+
+------ ------- ------ ------- ------ ------- 
+
+-- (object.slice|index,count|) - creates a shallow copy of range of table indexies
 
 object.slice = function(self,index,count)
   
@@ -1452,7 +1417,8 @@ object.slice = function(self,index,count)
      insert(slice,self[index + i])
    end end
   
-  slice = _isObject(self) and object(slice)
+  slice = object.isObject(self) and object(slice) or slice
+  
   return slice -- returns: table or object
   
 end
@@ -1460,10 +1426,6 @@ end
 ------ ------ ------ ------ 
 
 -- (object.splice|index,count,...|) - replace index range in a table with a variable list of arguments - behaves similarly to the javascript Array.splice method.
-
--- (index) - starting index - can be positive (from start) or negative (from end)
--- (count) - number of elements to remove - can be positive (remove forwards) or negative (remove backwards)
--- (vararg) - elements to insert at index - before (negative index) or after (positive index)
 
 object.splice = function(self,index,count,...)
   
@@ -1513,9 +1475,17 @@ object.splice = function(self,index,count,...)
    insert(self,index, spliced[len + 1 - i])
   end
   
- return unpack(removed) -- returns: vararg 
+ return unpack(removed) 
+   -- returns: vararg of removed entries
   
-end
+end   
+
+------- ------- ------- 
+
+-- TODO - Add range methods ...
+
+-- object.splice:range(start,fin,...)
+-- object.slice:range(start,fin)
 
 ------- ------- ------- ------- ------- ----
 -- Querying / Search Methods
@@ -1541,6 +1511,11 @@ object.ext:getter("count")
 -- object:contains(...) - determines if one or more entries exists in a source table
 
 object.contains = function(self,...) -- determines if table contains entry
+  
+ if not _canFunctionRun{ 
+  method = "object.contains",
+  types = {"table"},
+ self = self } then return false end
   
  local count = select("#",...)
  if count == 1 then; local val = select(1,...)
@@ -1649,26 +1624,79 @@ end
 
 object.first = function(self,count) 
   return _firstOrLast(self,1,count) 
-end -- returns: first entrie(s)
+end -- returns: (vararg) first entry(s)
 
 object.last = function(self,count) 
   return _firstOrLast(self,-1,count) 
-end -- returns: last entrie(s)
+end -- returns: (vararg) last entry(s)
 
 -------- -------- -------- -------- --------
 object:extend("first"); object:extend("last")
 -------- -------- -------- -------- --------
+
+local function _getIndexOfStart(self,index)
   
-object.first.indexOf = function(self,...)
-  return _indexOf(self,false,...)
-end -- returns: vararg - indices or nils
+ if type(self) ~= "table" then return -1
+ elseif index == nil or type(index) ~= "number" then return 1 end
+  
+ if index < 0 then 
+  local _index = #self + index + 1
+  index = _index < 0 and 0 or _index  end 
+ if index > #self + 1 then
+  index = #self + 1 end 
+
+ return index end -- returns: number 
+
+-- TBD - not sure if (_notFound) should be a setting/option i.e. return -1 or nil 
+
+--- ---- --- ---- --- ---- --- ----
+local _notFound = -1 -- returned by indexOf
+--- ---- --- ---- --- ---- --- ----
+
+-- finds the first index of a given value from a starting point (positive or negative index)
+  
+object.first.indexOf = function(self,val,from)
+  
+  if type(self) ~= "table" or val == nil then return _notFound end
+  
+  local index = _getIndexOfStart(self,from)
+  if index == -1 then return _notFound end
+  if from == nil or type(from) ~= "number" then index = 1 end
+
+  for i = index, #self do
+    if self[i] == val then return i end
+  end
+  
+return _notFound end
 
 --- --- --- ---- --- --- --- ---- --- ---
 object.indexOf = object.firstIndexOf
 --- --- --- ---- --- --- --- ---- --- ---
 
-object.last.indexOf = function(self,...)  
-  return _indexOf(self,true,...)    
+-- finds the last index of a given value from a starting point (positive or negative index)
+
+object.last.indexOf = function(self,val,from)
+  
+  if type(self) ~= "table" or val == nil then return _notFound end
+  
+  local index = _getIndexOfStart(self,from)
+  if index == -1 then return _notFound end
+  if from == nil or type(from) ~= "number" then index = #self end
+
+  for i = index, 1,-1 do
+    if self[i] == val then return i end
+  end
+  
+return _notFound end
+
+----- --- ----- --- ----- ---
+
+object.first.idexiesOf = function(self,...)
+  return _indexiesOf(self,false,...)
+end -- returns: vararg - indices or nils
+
+object.last.idexiesOf = function(self,...)  
+  return _indexiesOf(self,true,...)    
 end -- returns: vararg - indices or nils
 
 -------- -------- -------- -------- --------
@@ -1734,41 +1762,14 @@ object.range = function(self,start,fin)
 end
 
 -------- -------- -------- -------- --------
+-- object.copy|options| -- Prefix
+-------- -------- -------- -------- --------
+-- object.copy - copies an object based on the memory access pointer locations at a given level for a lua data type
 
--------- -------- -------- -------- 
--- object.copy|...| -- Prefix
--------- -------- -------- --------
--- object.copy: replaces an object based on the memory access pointer locations at a given level for a lua data type
--------- -------- -------- --------
-
-local _copy -- helper: copies objects
-_copy = function(self,depth)
-
-  if not self or depth == 0 then
-   return self end
-
-  local copy = {} 
-  for k,v in pairs(self) do 
-    
-    local value,type = self[k],type(v)
-    if type == "string" or type == "number" 
-     or type == "boolean" then copy[k] = v 
-      
-    elseif type == "table" or 
-    type == "function" then  
-     if depth == 1 then copy[k] = v
-     else copy[k] = _copy(v, depth - 1)
-    end end end
-  
-  return copy
-  
-end -- returns: object - copy of object
-
--------- -------- -------- --------
--- object.copy {depth: number, meta: boolean}
+-- options: {meta: boolean, depth:number}
 ---- ---- ---- ---- ---- ---- ---- ----
 
-object.copy = function(self,opt,ext)
+object.copy = function(self,opt)
 
   if not _canFunctionRun{ 
    method = "object.copy",
@@ -1827,13 +1828,13 @@ end -- returns: object - copy of object
 -- Object Status / Configuration Methods
 -------- -------- -------- -------- 
 
-object.inverse = function(self) -- Inverses numerical indexies of array
+object.invert = function(self) -- Inverses numerical indexies of array
   local pos = 0 for i = #self,1,-1 do i = i + pos self:insert(pos + 1, self:remove(i)) 
   pos = pos + 1 end return self
 end
 
 --- --- --- ---- --- --- --- ---- --- ---
-object.reverse = object.inverse ----
+object.reverse = object.invert ----
 --- --- --- ---- --- --- --- ---- --- ---
 
 object.concat = function(self,sep) -- Concantinates table indexies
@@ -1862,19 +1863,10 @@ object.concat = function(self,sep) -- Concantinates table indexies
 object.cat = object.concat
 --- --- --- ---- --- --- --- ---- 
 
--- Gets objects' __type values or data type
-
-object.type = function(self) 
-  if not self then return error("Invalid argument no.1 to object.type().",2) end
-  local meta = getmetatable(self) if meta and meta.__type then return meta.__type 
-    else return type(self) end 
-end -- returns: type string of object
-
-
 -------- -------- -------- -------- 
 -- object.is|...| -- Prefix
 -------- -------- -------- --------
--- object.is: determins equality and types of a data value compared against others
+-- object.is - determines equality and types of a data value compared against others
 -------- -------- -------- --------
 
 object.is = function(self,...)
@@ -1994,6 +1986,44 @@ object.is.containedIn = function(self,...)
    return false end end 
  return true end -- returns: true by default
 
+-------- -------- -------- -------- 
+
+-- Tests if a data value is an array i.e. only contains numerical indexiez
+
+object.is.array = function(self)
+  
+  if type(self) ~= "table" then 
+   return false end
+  
+  local count,hasKeys,form = 0,false
+  local index,value = next(self)
+  
+  while index do
+    count,form = count + 1, type(index)
+    if form ~= "number" then 
+     hasKeys = true end
+    index,value = next(self,index)
+  end
+  
+  local missing = 0
+  for i = 1,#self do
+    if not self[i] then 
+      missing = missing + 1 end
+  end
+  
+  if hasKeys or missing and count > #self - missing or count > #self then return false 
+  else return true end
+  
+end -- returns: (boolean) - true / false
+
+---- ------ ---- ------ 
+
+-- Tests if data value is an instance of the object class
+
+object.is.object = function(self)
+  return _isObject(self)
+end -- returns: (boolean) - true / false
+
 ----- ------ ------- -------- ---------
 -- [:toString] - pretty print data
 ----- ------ ------- -------- ---------
@@ -2030,6 +2060,12 @@ local function getToStringSettings()
     
 end
 
+----- ------ ------ ------ ------ ------
+-- object.tostring - converts a table to a string representation
+
+-- options: (string|table) 
+ -- - string - 'v' - prints out vertically
+ -- - table - see above ...
 ----- ------ ------ ------ ------ ------
 
 object.toString = function(self,opt) 
@@ -2115,6 +2151,14 @@ object.tostring = object.toString
 -- Access instance metatables and super classes / prorotypes
 ----- ------ ------- -------- --------
 
+-- Gets objects' __type values or data type
+
+object.type = function(self) 
+  if not self then return error("Invalid argument no.1 to object.type().",2) end
+  local meta = getmetatable(self) if meta and meta.__type then return meta.__type 
+  else return type(self) end 
+end -- returns: type string of object
+
 object.meta = function(self) -- Creates object reference to metatable
   local meta = getmetatable return meta(self)
  end -- returns: object metatable
@@ -2168,9 +2212,10 @@ object.unbind = object.release
 -- object:releaseFrom(...)
 
 ----- ------ ------- -------- --------
------ ------ ------- -------- --------
+-- (*) ---- ------ ----- ---- ------ ----- 
 
 
+ 
 ---- ------ ----- --- ------ -----
 -- ::WIP - begin:: - (unstable) --- --- --->
 ----- ------ --- ----- ------ ----
@@ -2194,6 +2239,7 @@ object.closest = function(self,object)
 end
 
 ]]
+
 
 ------------------------------------------------------------------
 -- Extra Utility Methods
@@ -2507,9 +2553,7 @@ end
 ----- ------ --- ----- ------ ----
 
 
-
-
-
+---- ------ ----- ---- ------ ----- ---- (*)
 ------------ ------------ ------------ 
 -- [debug] error handler / method checks
 ------------ ------------ ------------ 
@@ -2671,7 +2715,14 @@ _handleToString = function(value,opt)
     if val then 
      table.insert(list[type(key)],key)
    end end
-    
+  
+   local index = 1
+   while index <= #self do
+    if list.number[index] ~= index then
+      table.insert(list.number,index,index)
+    end index = index + 1
+   end
+  
    table.sort(list.string)
    table.sort(list.number)
 
@@ -2888,7 +2939,7 @@ _firstOrLast = function(self,dir,cnt)
 -------- ------ >>
 -- helper: finds indexOf table elements  
   
-_indexOf = function(self,last,...) 
+_indexiesOf = function(self,last,...) 
     
   local count,first,args,keymap,matches = select("#",...), select(1,...)
     
@@ -2927,7 +2978,69 @@ _indexOf = function(self,last,...)
 end
 
 -------- ------ >>
--- rounds floating point number to a given number of decimal places
+-- helper: creates a copy of a table value to a given depth
+
+_copy = function(self,depth) 
+  
+  if not self or depth == 0 then
+  return self end
+  
+  local copy = {} 
+  for k,v in pairs(self) do 
+    
+    local value,type = self[k],type(v)
+    if type == "string" or type == "number" 
+    or type == "boolean" then copy[k] = v 
+      
+    elseif type == "table" or 
+    type == "function" then  
+      if depth == 1 then copy[k] = v
+      else copy[k] = _copy(v, depth - 1)
+      end end end
+  
+  return copy
+  
+end -- returns: object - copy of object
+
+-------- ------ >>
+-- helper: gets index and count for :slice() and :splice functions
+
+_getIndexies = function(self,index,count)
+  
+  local _index, _count = index, count
+  
+  if index == nil and count == nil then
+    return 1, #self
+  end
+  
+  index,count = index and index or 1, count and count or 0
+  
+  if index == 0 then index = 1
+    count = count <= 0 and 0 or count - 1
+  elseif index < 0 then
+  index = #self + index end
+  index = index < 0 and 0 or index
+  
+  if count < 0 then
+    
+    if count < -1 then
+      index = index + count + 1
+    end count = math.abs(count)
+    
+    if index < 1 then 
+      count,index = count + (index - 1), 1
+      
+    end end
+  
+  index = _index < 0 and index + 1 or index
+  count = count > #self and #self or count
+  
+  return index,count -- returns: index and count (numbers)
+  
+end
+
+-------- ------ >>
+-- helper: rounds floating point number to a given number of decimal places
 
 _roundNumber = function(float,dps)
   local mult = 10^(dps or 0)
@@ -2936,7 +3049,7 @@ _roundNumber = function(float,dps)
 end
 
 -------- ------ >>
--- used to find objects in metadata
+-- helper: determines if data value is an object 
 
 _isObject = function(self)
     
