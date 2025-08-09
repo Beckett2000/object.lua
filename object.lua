@@ -547,7 +547,7 @@ local _proxy = function(ext,obj)
               
               -- members  
               -- proto
-              
+                   
           },
                             
           -------- ------ ---- >               
@@ -1082,11 +1082,8 @@ object.insert.atIndex = function(self,index,...)
    types = {"table","string"},
    self = self } then return self end
         
-  if count == 0 then return self end
-  local format = type(self)   
-    
-  local max,abs = #self + 1, abs
-  index = index < 1 and 1 or index > max and max or abs(index)
+  local format = type(self)     
+  index = index == 0 and 1 or index < 0 and #self + index + 1 or index > #self and #self + 1 or index
     
   -- string handling
     
@@ -1112,7 +1109,9 @@ object.insert.atIndex = function(self,index,...)
         
  return self end end -- returns: table (self)
 
------- ---- ------ ---- ------
+--- --- --- ---- --- --- --- ---- --- ---
+object.insert.at = object.insertAtIndex ----
+--- --- --- ---- --- --- --- ---- --- ---
 
 -- TBD - object.insert:fromTable(table) - potential proxy?
 
@@ -1223,7 +1222,7 @@ object.remove.first.indexOf =
 end
 
 --- --- --- ---- --- --- --- ---- --- --- ---
-object.remove.indexOf = --- ---
+object.remove.indexOf = --- --- >
   object.remove.first.indexOf --- ----
 --- --- --- ---- --- --- --- ---- --- --- ---
 
@@ -1298,7 +1297,7 @@ object.remove.beforeIndex =
 return unpack(out) end -- returns: vararg of removed values   
 
 --- --- --- ---- --- --- --- ---- --- --- ---
-object.remove.before = --- ---
+object.remove.before = --- --- >
   object.remove.beforeIndex --- ----
 --- --- --- ---- --- --- --- ---- --- --- ---
 
@@ -1324,7 +1323,7 @@ object.remove.afterIndex = function(self,index,number)
 return unpack(out) end -- returns: vararg of removed values
 
 --- --- --- ---- --- --- --- ---- --- --- ---
-object.remove.after = --- ---
+object.remove.after = --- --- >
   object.remove.afterIndex --- ----
 --- --- --- ---- --- --- --- ---- --- --- ---
 
@@ -1513,7 +1512,7 @@ object.remove.indexiesOf = function(self,...)
     count = count + 1
   end end
   
-  return unpack(removed) -- returns: vararg removed indexies
+  return unpack(removed) -- returns: (vararg) removed indexies
   
 end
 
@@ -1544,7 +1543,7 @@ object.remove.keysOf = function(self,...)
     end end index,value = next(self,index)
   end
   
-  return unpack(removed) -- returns: vararg removed indexies
+  return unpack(removed) -- returns: (vararg) removed indexies
   
 end
 
@@ -1596,27 +1595,27 @@ end -- returns: (vararg) removed entries
 
 --- --- --- ---- --- --- --- ---- --- ---
 
+
 ------- ------- ------- ------- ------- ----
 -- Array Manipulation Methods - (Javascript)
 ------- ------- ------- ------- ------- ----
 
--- (*) https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array (*) ---- --- ---- --- ---- ---
+-- These functions modify the array component of lua tables. note: these functions are very similar to the Javascript Array method implementations: 
 
--- note: these functions are very similar to the Javascript Array function implementations: 
+-- (*) https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array (*) ---- --- ---- ---
 
------- ------- ------ ------- ------ -------- 
--- slice(self,index,count) --- ---- -----
--- splice(self,index,count,...) --- -----
------- ------- ------ ------- ------ -------- 
+--- --- --- ---- --- --- --- ---- --- ---
+
+-- object.array -- TBD - add lightweight array object constructor / getter ???
+
+-- object.array = function() return end
+
+--- --- --- ---- --- --- --- ---- --- ---
+
+-- (object.slice|index,count|) - creates a shallow copy of array indexies from a starting point and an offset
 
 -- (index) - starting index - can be positive (from start) or negative (from end)
 -- (count) - number of elements to remove - can be positive (remove forwards) or negative (remove backwards)
-
--- (vararg) - elements to insert at index - before (negative index) or after (positive index)
-
------- ------- ------ ------- ------ ------- 
-
--- (object.slice|index,count|) - creates a shallow copy of range of table indexies
 
 object.slice = function(self,index,count)
   
@@ -1641,9 +1640,25 @@ object.slice = function(self,index,count)
   
 end
 
------- ------ ------ ------ 
+------ ---- ------ ---- ------ ---- ------
+object:extend("slice") ---- ----
+------ ---- ------ ---- ------ ---- ------
+
+-- (object.slice|start,fin|) creates a shallow copy of a range of table indexies from start and end anchor points
+
+object.slice.range = function(self,start,fin)
+  
+  
+end
+
+--- --- --- ---- --- --- --- ---- --- ---
 
 -- (object.splice|index,count,...|) - replace index range in a table with a variable list of arguments - behaves similarly to the javascript Array.splice method.
+
+-- (index) - starting index - can be positive (from start) or negative (from end)
+-- (count) - number of elements to remove - can be positive (remove forwards) or negative (remove backwards)
+
+-- (vararg) - elements to insert at index - before (negative index) or after (positive index)
 
 object.splice = function(self,index,count,...)
   
@@ -1694,16 +1709,23 @@ object.splice = function(self,index,count,...)
   end
   
  return unpack(removed) 
-   -- returns: vararg of removed entries
+   -- returns: (vararg) removed entries
   
 end   
 
-------- ------- ------- 
+------ ---- ------ ---- ------ ---- ------
+object:extend("splice") ---- ----
+------ ---- ------ ---- ------ ---- ------
 
--- TODO - Add range methods ...
+-- (object.splice.range|start,fin,...|) replaces data values between start and end indexies with one or more values
 
--- object.splice:range(start,fin,...)
--- object.slice:range(start,fin)
+object.slice.range =
+  function(self,start,fin,...)
+  
+  
+end
+
+--- --- --- ---- --- --- --- ---- --- ---
 
 ------- ------- ------- ------- ------- ----
 -- Querying / Search Methods
@@ -2367,6 +2389,8 @@ object.type = function(self)
   local meta = getmetatable(self) if meta and meta.__type then return meta.__type 
   else return type(self) end 
 end -- returns: type string of object
+
+-- TBD - change some of these properties to getters vs method calls ... i.e. call on object, but property on instances
 
 object.meta = function(self) -- Creates object reference to metatable
   local meta = getmetatable return meta(self)
