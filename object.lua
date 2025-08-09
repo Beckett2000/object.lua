@@ -1489,14 +1489,62 @@ object.remove.keys = function(self,...)
  return unpack(out,1,len) end -- output (removed values)
 
 --- --- --- ---- --- --- --- ---- --- ---
+-- removes all indexies of occurance for one or more data values in a source table
 
 object.remove.indexiesOf = function(self,...)
+  
+  if not _canFunctionRun{ 
+    method = "object.remove.indexiesOf",
+    types = {"table"},
+  self = self } then return end
+  
+  local insert,remove = table.insert, table.remove
+  
+  local args,removed = {},{}
+  for _,val in iter(...) do
+   if val then args[val] = true end
+  end
+  
+  local count = 0;
+  
+  for i = 1,#self do 
+   if args[self[i - count]] then 
+    remove(self,i - count) insert(removed,i)
+    count = count + 1
+  end end
+  
+  return unpack(removed) -- returns: vararg removed indexies
   
 end
 
 --- --- --- ---- --- --- --- ---- --- ---
+-- removes all keys of occurance for one or more data values in a source table
 
 object.remove.keysOf = function(self,...)
+  
+  if not _canFunctionRun{ 
+    method = "object.remove.keysOf",
+    types = {"table"},
+  self = self } then return end
+  
+  local insert = table.insert
+  
+  local args,removed = {},{}
+  for _,val in iter(...) do
+   if val then args[val] = true end
+  end
+  
+  local index,value = next(self)
+  
+  while value do
+    if args[value] then
+     local _type = type(index)
+     if _type ~= "number" or _type == "number" and index > #self then
+      self[index] = nil; insert(removed,index)
+    end end index,value = next(self,index)
+  end
+  
+  return unpack(removed) -- returns: vararg removed indexies
   
 end
 
