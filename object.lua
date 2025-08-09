@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.14159 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-08-25)
+-- object.lua - 3.14159 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-09-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -102,7 +102,7 @@ local _handleToString, _objSerialDescriptor
 local _errorHandler, _canFunctionRun
 ------------ ------------ ------------ 
 local _isObject, _firstOrLast, _indexiesOf,
- _copy, _getIndexies, _roundNumber
+_copy, _getIndexies, _roundNumber, _removeIndexiesOf
 ------------ ------------ ------------
 
 ------------ ------------ ------------ 
@@ -986,7 +986,6 @@ end
 --- --- --- ---- --- --- --- ---- --- ---
 object.insert = table.insert
 --- --- --- ---- --- --- --- ---- --- ---
------- ---- ------ ---- ------
 object:extend("insert") ---- ---- (*)
 ------ ---- ------ ---- ------
 
@@ -1154,7 +1153,6 @@ object.insert.keysFromTable = function(self,source,overwrite) -- inserts keys fr
 --- --- --- ---- --- --- --- ---- --- ---
 object.remove = table.remove
 --- --- --- ---- --- --- --- ---- --- ---
------- ---- ------ ---- ------
 object:extend("remove") ---- ---- (*)
 ------ ---- ------ ---- ------
 
@@ -1183,35 +1181,6 @@ object.remove:extend("first") ---- ----
 ------ ---- ------ ---- ------ ---- ------
 
 --- --- --- ---- --- --- --- ---- --- ---
--- removes the firat occurance of a data value from a given table
-
-object.remove.first.indexOf = 
- function(self,value,from)
-  
-  if not _canFunctionRun{ 
-   method = "object.remove.firstIndexOf",
-   types = {"table"},
-   self = self } then return end
-  
-  local index = object.firstIndexOf(self,value,from)
-  
-  if index > 0 then
-   return table.remove(self,index) end 
-  
-end
-
---- --- --- ---- --- --- --- ---- --- --- ---
-object.remove.indexOf = object.remove.first.indexOf
---- --- --- ---- --- --- --- ---- --- --- ---
-
---- --- --- ---- --- --- --- ---- --- ---
-
-object.remove.first.indexiesOf = 
-function(self,...)
-  
-end
-
---- --- --- ---- --- --- --- ---- --- ---
 -- remove index value(s) from table end
 
 object.remove.last = function(self,number) 
@@ -1236,6 +1205,29 @@ object.remove:extend("last") ---- ----
 ------ ---- ------ ---- ------ ---- ------
 
 --- --- --- ---- --- --- --- ---- --- ---
+-- removes the first occurance of a data value from a given table
+
+object.remove.first.indexOf = 
+ function(self,value,from)
+  
+  if not _canFunctionRun{ 
+   method = "object.remove.firstIndexOf",
+   types = {"table"},
+   self = self } then return end
+  
+  local index = object.firstIndexOf(self,value,from)
+  
+  if index > 0 then
+   return table.remove(self,index) end 
+  
+end
+
+--- --- --- ---- --- --- --- ---- --- --- ---
+object.remove.indexOf = --- ---
+  object.remove.first.indexOf --- ----
+--- --- --- ---- --- --- --- ---- --- --- ---
+
+--- --- --- ---- --- --- --- ---- --- ---
 -- removes the last occurance of a data value from a given table
 
 object.remove.last.indexOf = 
@@ -1254,10 +1246,33 @@ function(self,value,from)
 end
 
 --- --- --- ---- --- --- --- ---- --- ---
+-- removes the first index(ies) of occurance for a list of one or more data values
+
+object.remove.first.indexiesOf = 
+ function(self,...)
+  
+  if not _canFunctionRun{ 
+   method = "object.remove.firstIndexiesOf",
+   types = {"table"},
+  self = self } then return end
+  
+  return _removeIndexiesOf(self,"first",...) 
+
+end
+
+--- --- --- ---- --- --- --- ---- --- ---
+-- removes the last index(ies) of occurance for a list of one or more data values
 
 object.remove.last.indexiesOf = 
  function(self,...)
   
+  if not _canFunctionRun{ 
+   method = "object.remove.lastIndexiesOf",
+   types = {"table"},
+  self = self } then return end
+
+  return _removeIndexiesOf(self,"last",...) 
+
 end
 
 --- --- --- ---- --- --- --- ---- --- ---
@@ -1282,7 +1297,10 @@ object.remove.beforeIndex =
     
 return unpack(out) end -- returns: vararg of removed values   
 
---- --- --- ---- --- --- --- ---- --- ---
+--- --- --- ---- --- --- --- ---- --- --- ---
+object.remove.before = --- ---
+  object.remove.beforeIndex --- ----
+--- --- --- ---- --- --- --- ---- --- --- ---
 
 -- remove value(s) from a table which are stored after a certain indice
 
@@ -1305,6 +1323,11 @@ object.remove.afterIndex = function(self,index,number)
   
 return unpack(out) end -- returns: vararg of removed values
 
+--- --- --- ---- --- --- --- ---- --- --- ---
+object.remove.after = --- ---
+  object.remove.afterIndex --- ----
+--- --- --- ---- --- --- --- ---- --- --- ---
+
 --- --- --- ---- --- --- --- ---- --- ---
 -- remives a set number of values ar a given index from a table (including the index)
 
@@ -1313,7 +1336,9 @@ object.remove.atIndex =
   return object.splice(self,index,count)
 end
 
---- --- --- ---- --- --- --- ---- --- ---
+--- --- --- ---- --- --- --- ---- --- --- ---
+object.remove.at = object.remove.atIndex
+--- --- --- ---- --- --- --- ---- --- --- ---
 
 --- --- --- ---- --- --- --- ---- --- ---
 -- (helper) gets index point for a positive or negative index value
@@ -3192,6 +3217,42 @@ _getIndexies = function(self,index,count)
   
   return index,count -- returns: index and count (numbers)
   
+end
+
+-------- ------ >>
+--- --- --- ---- --- --- --- ---- --- ---
+-- (helper) removes the first or last index(ies) of occurance for a list of one or more data values
+
+_removeIndexiesOf = function(self,pos,...)  
+  
+  if select("#",...) == 0 then return end
+  
+  local args,count = {}, 0
+  for _,val in iter(...) do 
+   if val then if not args[val] then 
+    args[val],count = 0, count + 1 end  
+   args[val] = args[val] + 1 end end
+    
+  local removed,arg,index = 0;
+  
+  local step,start,fin = 1
+  if pos == "first" then start,fin = 1, #self
+  else start,fin,step = #self, 1, -1 end
+  
+  for i = start,fin,step do 
+
+   arg,lookup = self[i], args[self[i]]
+   if lookup then args[arg] = lookup - 1
+
+    table.remove(self,i) 
+    removed = removed + 1
+      
+    if args[arg] == 0 then 
+     args[arg],count = nil, count - 1
+   end end
+    
+   if count == 0 or pos == "first" and i + removed == #self or pos == "last" and i == removed + 1 then return end end
+ 
 end
 
 -------- ------ >>
