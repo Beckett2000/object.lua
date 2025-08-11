@@ -1,5 +1,5 @@
 -------------------------------------------
--- object.lua - 3.14159 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-09-25)
+-- object.lua - 3.14159 - Object Library for Lua programming - (Beckett Dunning 2014 - 2025) - WIP (8-10-25)
 -------------------------------------------
 
 -- local value = object() / object.new()
@@ -102,7 +102,7 @@ local _handleToString, _objSerialDescriptor
 local _errorHandler, _canFunctionRun
 ------------ ------------ ------------ 
 local _isObject, _firstOrLast, _indexiesOf,
-_copy, _getIndexies, _roundNumber, _removeIndexiesOf
+_copy, _getIndexies, _roundNumber, _removeIndexiesOf, _anchorIndex
 ------------ ------------ ------------
 
 ------------ ------------ ------------ 
@@ -1340,21 +1340,6 @@ object.remove.at = object.remove.atIndex
 --- --- --- ---- --- --- --- ---- --- --- ---
 
 --- --- --- ---- --- --- --- ---- --- ---
--- (helper) gets index point for a positive or negative index value
-
-local function _anchorIndex(self,index,start)  
-  
- if type(index) ~= "number" then 
-   return end
-  
- if index < 1 then 
-   index = #self + index
-   if start then index = index + 1 end
- end
-
- return index < 1 and 1 or index >= #self and #self or index end 
-
---- --- --- ---- --- --- --- ---- --- ---
 -- removes a range of elements in a table from start to fin. if start is greater than fin then the range is inverted ...
 --- --- --- ---- --- --- --- ---- --- ---
 
@@ -1648,6 +1633,22 @@ object:extend("slice") ---- ----
 
 object.slice.range = function(self,start,fin)
   
+  if not _canFunctionRun{ 
+    method = "object.slice.range",
+    types = {"table"},
+  self = self } then return end
+  
+  local _start = _anchorIndex(self,start)
+  local _fin = _anchorIndex(self,fin)
+ 
+  local index,count; 
+  if _start > _fin then
+    index,count = fin, (_start - _fin) + 1
+  elseif _fin > _start then
+    index,count = start, (_fin - _start) + 1
+  else index,count = start,1 end
+
+  return object.slice(self,index,count)
   
 end
 
@@ -1719,9 +1720,25 @@ object:extend("splice") ---- ----
 
 -- (object.splice.range|start,fin,...|) replaces data values between start and end indexies with one or more values
 
-object.slice.range =
+object.splice.range =
   function(self,start,fin,...)
   
+  if not _canFunctionRun{ 
+    method = "object.splice.range",
+    types = {"table"},
+  self = self } then return end
+  
+  local _start = _anchorIndex(self,start)
+  local _fin = _anchorIndex(self,fin)
+  
+  local index,count; 
+  if _start > _fin then
+    index,count = fin, (_start - _fin) + 1
+  elseif _fin > _start then
+    index,count = start, (_fin - _start) + 1
+  else index,count = start,1 end
+  
+  return object.slice(self,start,count,...)
   
 end
 
@@ -3253,6 +3270,24 @@ _copy = function(self,depth,temps)
   return copy
   
 end -- returns: object - copy of object
+
+-------- ------ >>
+--- --- --- ---- --- --- --- ---- --- ---
+-- (helper) gets index point for a positive or negative index value
+
+_anchorIndex = function(self,index,start)  
+  
+ if type(index) ~= "number" then 
+   return end
+  
+ if index < 1 then 
+   index = #self + index
+   if start then index = index + 1 end
+ end
+
+ return index < 1 and 1 or index >= #self and #self or index 
+
+end 
 
 -------- ------ >>
 -- helper: gets index and count for :slice() and :splice functions
