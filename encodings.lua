@@ -39,11 +39,18 @@ local vigenere = {
   -- vigenere.encode(txt,key,options)
   -- change text to encoded text with string key / cipher ...
   
+  --[[
+  
   -- txt (string) -- text to be encoded
   -- key (string) -- key to encode with
 
-  -- options: (optional - table) 
-  -- -- {chars: (string - charset)}
+  -- options: (optional - table): {
+  --- chars: (string)
+  --- keys: (string - regexp) -- allowed keys beyond charaset -- uses Lua lightweight regex i.e '*' or '%s'
+  
+  }
+  
+  --]]
   
   encode = function(txt,key,opt)
 
@@ -51,7 +58,14 @@ local vigenere = {
    if not key then return txt end
   
    local charset = opt and opt.chars or "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  
+    
+   local ignoreInvalid = 0
+   if opt and opt.keys then
+    if opt.keys == "*" then ignoreInvalid = 1 
+    elseif type(opt.keys) == "string" then
+     ignoreInvalid = -1
+   end end
+      
    local cat,insert =
     table.concat,table.insert
   
@@ -67,14 +81,17 @@ local vigenere = {
       
      local keyChar = key:sub(i - skipped,i - skipped)
       
-     --[[
-     -- skip invalid characters in password
-     while not set[keyChar] do
-      skipped = skipped + 1
-      keyChar = key:sub(i - skipped, i - skipped)
-      end
-     ]]
-      
+     -- skip invalid characters in key / password
+        
+     if ignoreInvalid == 1 or 
+        ignoreInvalid == -1 then
+          
+      while not set[keyChar] do
+       if ignoreInvalid == -1 and not keyChar:match(opt.keys) then break end
+       skipped = skipped + 1
+       keyChar = key:sub(i - skipped, i - skipped)      
+      end end
+
      delta = set[keyChar] - 1
      idx = (idx + delta) % #charset
      _idx = (set[char] + delta) % #charset
@@ -117,6 +134,11 @@ local function testVigenereCipher()
    vigenere.encode(txt,key))
   
   print("expected output: ","ovnlqbpvt hznzeuz")
+
+  txt = "the quick brown fox ran down the road"
+  
+  local encode = vigenere.encode
+  print(encode(txt,txt,{keys = "%s"}))
 
 end 
 
