@@ -168,7 +168,7 @@ object:insert().Value() / object:insert().value()
 Usage example:
 
 ```lua
-local tree = object{leaves = "green")
+local tree = object{leaves = "green"}
 tree:insertFirst("branches") --> tree{"branches",leaves = "green"}
 tree.insert.first("bark") --> tree{"bark","branches",leaves = "green"}
 tree.insert:Last("dew") --> tree{"bark","branches",leaves = "green","dew"}
